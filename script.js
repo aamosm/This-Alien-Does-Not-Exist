@@ -1,225 +1,283 @@
-function mulberry32(seed) {
-    return function () {
-        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-        let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+/*
+ * PRNG Seed Management
+ * Mulberry32 pseudorandom number generator
+ */
+function mulberry32(a) {
+    return function() {
+        var t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
         return ((t ^ t >>> 14) >>> 0) / 4294967296;
     }
 }
 
-const ARCHETYPES = [
-    {
-        name: "Cursorial", tagline: "Agile Runner",
-        spineStepMult: 1.3, spineThickMult: 0.8,
-        limbStepMult: 1.7, limbThickMult: 0.7,
-        limbCountRange: [4, 6], hueRange: [25, 55],
-        dietPool: ["Carnivore", "Omnivore"],
-        habitat: "Open Plains",
-        temperamentPool: ["Skittish", "Territorial", "Pack-hunting"]
-    },
-    {
-        name: "Graviportal", tagline: "Heavy Bruiser",
-        spineStepMult: 1.0, spineThickMult: 1.6,
-        limbStepMult: 0.85, limbThickMult: 2.0,
-        limbCountRange: [4, 4], hueRange: [15, 35],
-        dietPool: ["Herbivore", "Omnivore"],
-        habitat: "Highland Terrain",
-        temperamentPool: ["Docile", "Territorial", "Slow to anger"]
-    },
-    {
-        name: "Scansorial", tagline: "Climber",
-        spineStepMult: 1.1, spineThickMult: 1.0,
-        limbStepMult: 1.3, limbThickMult: 1.0,
-        limbCountRange: [4, 8], hueRange: [90, 150],
-        dietPool: ["Omnivore", "Frugivore"],
-        habitat: "Canopy / Cliffside",
-        temperamentPool: ["Curious", "Cautious", "Social"]
-    },
-    {
-        name: "Aquatic", tagline: "Swimmer",
-        spineStepMult: 1.8, spineThickMult: 1.3,
-        limbStepMult: 0.5, limbThickMult: 0.8,
-        limbCountRange: [0, 2], hueRange: [190, 230],
-        dietPool: ["Filter-feeder", "Carnivore"],
-        habitat: "Subsurface Ocean",
-        temperamentPool: ["Solitary", "Migratory", "Docile"]
-    }
-];
+/*
+ * Allometric Normalization Coefficients
+ * Source: Allometry and Biomechanics: Limb Bones in Adult Ungulates (McMahon, 1975)
+ * https://pdodds.w3.uvm.edu/files/papers/others/1975/mcmahon1975b.pdf
+ */
+const ARCHETYPES = {
+    "Cursorial": { asl: 1.8, asd: 0.8, all: 2.5, ald: 0.9 },
+    "Graviportal": { asl: 1.2, asd: 1.6, all: 1.0, ald: 2.2 },
+    "Scansorial": { asl: 1.5, asd: 1.0, all: 2.0, ald: 1.4 },
+    "Aquatic": { asl: 2.2, asd: 1.4, all: 0.6, ald: 0.8 }
+};
 
-function pick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
-
-// ---- Geometry generators, now archetype-aware ----
-function genSpine(rng, segments, stepMult) {
-    const points = [];
-    let x = 400, y = 150 + rng() * 40;
-    let angle = Math.PI / 2;
-    const step = 35 * stepMult;
-    for (let i = 0; i < segments; i++) {
-        points.push({ x, y });
-        angle += (rng() - 0.5) * 1.1;
-        x += Math.cos(angle) * step;
-        y += Math.sin(angle) * step;
+function generateGenome(seedValue, archetypeKey) {
+    const rng = mulberry32(seedValue);
+    const baseMass = 2000 + rng() * 13000;
+    const arch = ARCHETYPES[archetypeKey] || ARCHETYPES["Cursorial"];
+    
+    function perturb(val) {
+        return val * (0.95 + rng() * 0.10);
     }
-    return points;
+    
+    /*
+     * Elastic Similarity Model
+     * Length scales to M^0.25, Diameter scales to M^0.375
+     */
+    const spineLength = perturb(arch.asl) * Math.pow(baseMass, 0.25);
+    const spineDiameter = perturb(arch.asd) * Math.pow(baseMass, 0.375);
+    const limbLength = perturb(arch.all) * Math.pow(baseMass, 0.25);
+    const limbDiameter = perturb(arch.ald) * Math.pow(baseMass, 0.375);
+
+
+    const spineCount = 5 + Math.floor(rng() * 6); // 5 to 10 nodes
+    const frontAttach = 1 + Math.floor(rng() * 3); // Node 1, 2, or 3
+    const rearAttach = spineCount - 2 - Math.floor(rng() * 2); // Dynamic rear positioning
+    
+    const legSegments = 2 + Math.floor(rng() * 3); // 2 to 4 segments per leg
+    const shoulderWidth = 20 + rng() * 60; // Narrow to wide stances
+    const legSpreadX = 1.2 + rng() * 2.5; // Horizontal target spread
+    
+
+    const legDirY = -0.5 + rng() * 2.0; 
+
+    return {
+        rng: rng,
+        mass: baseMass,
+        sl: spineLength,
+        sd: spineDiameter,
+        ll: limbLength,
+        ld: limbDiameter,
+        spineCount: spineCount,
+        frontAttach: frontAttach,
+        rearAttach: rearAttach,
+        legSegments: legSegments,
+        shoulderWidth: shoulderWidth,
+        legSpreadX: legSpreadX,
+        legDirY: legDirY
+    };
 }
 
-function radiusAt(i, total, rng, maxR, thickMult) {
-    const t = i / (total - 1);
-    const bell = Math.sin(t * Math.PI);
-    const noise = (rng() - 0.5) * 6;
-    return (10 + bell * maxR + noise) * thickMult;
+/*
+ * Forward And Backward Reaching Inverse Kinematics (FABRIK)
+ * Source: FABRIK.pdf (Andreas Aristidou)
+ */
+function solveFABRIK(chain, targetX, targetY) {
+    const n = chain.length;
+    const lengths = [];
+    let totalLength = 0;
+    
+    for (let i = 0; i < n - 1; i++) {
+        const dist = Math.hypot(chain[i+1].x - chain[i].x, chain[i+1].y - chain[i].y);
+        lengths.push(dist);
+        totalLength += dist;
+    }
+
+    const root = { x: chain[0].x, y: chain[0].y };
+    const distToTarget = Math.hypot(targetX - root.x, targetY - root.y);
+
+    if (distToTarget >= totalLength) {
+        for (let i = 0; i < n - 1; i++) {
+            const r = Math.hypot(targetX - chain[i].x, targetY - chain[i].y);
+            const lambda = lengths[i] / (r || 1);
+            chain[i+1].x = (1 - lambda) * chain[i].x + lambda * targetX;
+            chain[i+1].y = (1 - lambda) * chain[i].y + lambda * targetY;
+        }
+    } else {
+        for (let iter = 0; iter < 4; iter++) {
+            chain[n-1].x = targetX;
+            chain[n-1].y = targetY;
+            for (let i = n - 2; i >= 0; i--) {
+                const r = Math.hypot(chain[i+1].x - chain[i].x, chain[i+1].y - chain[i].y);
+                const lambda = lengths[i] / (r || 1);
+                chain[i].x = (1 - lambda) * chain[i+1].x + lambda * chain[i].x;
+                chain[i].y = (1 - lambda) * chain[i+1].y + lambda * chain[i].y;
+            }
+            
+            chain[0].x = root.x;
+            chain[0].y = root.y;
+            for (let i = 0; i < n - 1; i++) {
+                const r = Math.hypot(chain[i+1].x - chain[i].x, chain[i+1].y - chain[i].y);
+                const lambda = lengths[i] / (r || 1);
+                chain[i+1].x = (1 - lambda) * chain[i].x + lambda * chain[i+1].x;
+                chain[i+1].y = (1 - lambda) * chain[i].y + lambda * chain[i+1].y;
+            }
+        }
+    }
 }
 
-function genLimb(rng, originX, originY, baseAngle, stepMult, thickMult) {
-    const limb = [];
-    let x = originX, y = originY;
-    let angle = baseAngle + (rng() - 0.5) * 0.5;
-    const segments = 3 + Math.floor(rng() * 2);
-    const step = 26 * stepMult;
-    for (let i = 0; i < segments; i++) {
-        limb.push({ x, y, r: (8 + rng() * 8 * (1 - i / segments)) * thickMult });
-        angle += (rng() - 0.5) * 0.4;
-        x += Math.cos(angle) * step;
-        y += Math.sin(angle) * step;
-    }
-    return limb;
+
+function sdUnevenCapsule(px, py, ax, ay, bx, by, r1, r2) {
+    const h = Math.hypot(bx - ax, by - ay);
+    if (h === 0) return Math.hypot(px - ax, py - ay) - r1;
+    
+    const dirX = (bx - ax) / h;
+    const dirY = (by - ay) / h;
+    const tx = px - ax;
+    const ty = py - ay;
+    
+    const localY = tx * dirX + ty * dirY;
+    const localX = tx * -dirY + ty * dirX;
+    
+    const pX = Math.abs(localX);
+    const pY = localY;
+    const b = (r1 - r2) / h;
+    const a = Math.sqrt(Math.max(0.0, 1.0 - b * b));
+    const k = pX * a - pY * b;
+
+    if (k < 0.0) return Math.hypot(pX, pY) - r1;
+    if (k > a * h) return Math.hypot(pX, pY - h) - r2;
+    return pX * a + pY * b - r1;
 }
 
-function smin(a, b, k) {
-    const h = Math.max(k - Math.abs(a - b), 0) / k;
-    return Math.min(a, b) - h * h * k * 0.25;
+
+function sminCubic(a, b, k) {
+    const h = Math.max(0, Math.min(1, 0.5 + 0.5 * (b - a) / k));
+    return b + (a - b) * h - k * h * (1.0 - h);
 }
-function fieldAt(px, py, circles) {
-    let d = Infinity;
-    for (const c of circles) {
-        const dist = Math.hypot(px - c.x, py - c.y) - c.r;
-        d = smin(d, dist, 45);
+
+function evaluateField(px, py, bones) {
+    if (bones.length === 0) return Infinity;
+
+    let bone = bones[0];
+    let d = sdUnevenCapsule(px, py, bone.ax, bone.ay, bone.bx, bone.by, bone.r1, bone.r2);
+
+    for (let i = 1; i < bones.length; i++) {
+        bone = bones[i];
+        const dist = sdUnevenCapsule(px, py, bone.ax, bone.ay, bone.bx, bone.by, bone.r1, bone.r2);
+        d = sminCubic(d, dist, 12.0);
     }
+
     return d;
 }
 
-function hslToRgb(h, s, l) {
-    s /= 100; l /= 100;
-    const k = n => (n + h / 30) % 12;
-    const a = s * Math.min(l, 1 - l);
-    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-    return [255 * f(0), 255 * f(8), 255 * f(4)];
-}
-
-function classifySize(area) {
-    if (area < 15000) return "Small";
-    if (area < 35000) return "Medium";
-    if (area < 60000) return "Large";
-    return "Massive";
-}
-
-const canvas = document.getElementById("c");
-const ctx = canvas.getContext("2d");
-
-function generateNew() {
-    renderCreature(Math.floor(Math.random() * 4294967296));
-}
-
-function renderCreature(seedValue) {
-    const startTime = performance.now();
-    const rng = mulberry32(seedValue);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const archetype = pick(rng, ARCHETYPES);
-
-    const spineSegments = 5 + Math.floor(rng() * 8);
-    const spine = genSpine(rng, spineSegments, archetype.spineStepMult);
-    const circles = [];
-
-    for (let i = 0; i < spine.length; i++) {
-        circles.push({
-            x: spine[i].x, y: spine[i].y,
-            r: radiusAt(i, spine.length, rng, 45, archetype.spineThickMult)
+function buildRig(genome, startX, startY) {
+    const bones = [];
+    const spineNodes = [];
+    let cx = startX, cy = startY;
+    let currentRadius = genome.sd * 0.5;
+    
+    for (let i = 0; i < genome.spineCount; i++) {
+        spineNodes.push({ x: cx, y: cy, r: currentRadius });
+        
+  
+        cx += (genome.rng() - 0.5) * 20;
+        cy += genome.sl;
+        
+   
+        currentRadius *= 0.85 + genome.rng() * 0.3;
+    }
+    
+    for (let i = 0; i < spineNodes.length - 1; i++) {
+        bones.push({
+            ax: spineNodes[i].x, ay: spineNodes[i].y,
+            bx: spineNodes[i+1].x, by: spineNodes[i+1].y,
+            r1: spineNodes[i].r, r2: spineNodes[i+1].r
         });
     }
 
-    const [minLimbs, maxLimbs] = archetype.limbCountRange;
-    const numLimbs = minLimbs + Math.floor(rng() * (maxLimbs - minLimbs + 1));
+   
+    const attachPoint = spineNodes[Math.min(genome.frontAttach, spineNodes.length - 1)];
+    const lowerAttachPoint = spineNodes[Math.max(0, Math.min(genome.rearAttach, spineNodes.length - 1))];
 
-    for (let i = 0; i < numLimbs; i++) {
-        const attachIdx = 2 + Math.floor(rng() * Math.max(1, spine.length - 4));
-        const side = rng() < 0.5 ? -1 : 1;
-        const baseAngle = side * (Math.PI / 2) + (rng() - 0.5) * 0.6;
-        circles.push(...genLimb(rng, spine[attachIdx].x, spine[attachIdx].y, baseAngle,
-            archetype.limbStepMult, archetype.limbThickMult));
+    function addLimbPair(attach, length, diam) {
+        if (!attach) return;
+        
+        [-1, 1].forEach(side => {
+            const limbChain = [{ x: attach.x, y: attach.y }];
+            
+    
+            const segLength = length / genome.legSegments;
+            let currentX = attach.x;
+            let currentY = attach.y;
+
+            for (let s = 1; s <= genome.legSegments; s++) {
+                currentX += (genome.shoulderWidth / genome.legSegments) * side;
+                currentY += segLength;
+                limbChain.push({ x: currentX, y: currentY });
+            }
+          
+  
+            const targetX = attach.x + length * genome.legSpreadX * side;
+            const targetY = attach.y + length * genome.legDirY;
+            
+            solveFABRIK(limbChain, targetX, targetY);
+            
+            let currentDiam = diam;
+            for (let i = 0; i < limbChain.length - 1; i++) {
+                const nextDiam = currentDiam * 0.7; 
+                bones.push({
+                    ax: limbChain[i].x, ay: limbChain[i].y,
+                    bx: limbChain[i+1].x, by: limbChain[i+1].y,
+                    r1: currentDiam, r2: nextDiam
+                });
+                currentDiam = nextDiam;
+            }
+        });
     }
 
-    const [hueMin, hueMax] = archetype.hueRange;
-    const hue = hueMin + rng() * (hueMax - hueMin);
-    const [baseR, baseG, baseB] = hslToRgb(hue, 45 + rng() * 25, 45 + rng() * 15);
+    addLimbPair(attachPoint, genome.ll, genome.ld);
+    addLimbPair(lowerAttachPoint, genome.ll, genome.ld);
+    
+    return bones;
+}
 
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    const margin = 40;
-    for (const c of circles) {
-        minX = Math.min(minX, c.x - c.r - margin);
-        minY = Math.min(minY, c.y - c.r - margin);
-        maxX = Math.max(maxX, c.x + c.r + margin);
-        maxY = Math.max(maxY, c.y + c.r + margin);
-    }
-    minX = Math.max(0, Math.floor(minX));
-    minY = Math.max(0, Math.floor(minY));
-    maxX = Math.min(canvas.width, Math.ceil(maxX));
-    maxY = Math.min(canvas.height, Math.ceil(maxY));
-    const boxWidth = maxX - minX, boxHeight = maxY - minY;
-    if (boxWidth <= 0 || boxHeight <= 0) { generateNew(); return; }
-
-    // Facts that will be derived
-    const sizeClass = classifySize(boxWidth * boxHeight);
-    const diet = pick(rng, archetype.dietPool);
-    const temperament = pick(rng, archetype.temperamentPool);
-
-    const offscreen = document.createElement('canvas');
-    offscreen.width = boxWidth; offscreen.height = boxHeight;
-    const offCtx = offscreen.getContext('2d');
-    const imgData = offCtx.createImageData(boxWidth, boxHeight);
+function renderAlien(canvasId, seed, archetypeKey) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    
+    const genome = generateGenome(seed, archetypeKey);
+    const bones = buildRig(genome, canvas.width / 2, 150);
+    
+    const imgData = ctx.createImageData(canvas.width, canvas.height);
     const data = imgData.data;
-    const eps = 1.0;
 
-    for (let py = 0; py < boxHeight; py++) {
-        for (let px = 0; px < boxWidth; px++) {
-            const x = minX + px, y = minY + py;
-            const d = fieldAt(x, y, circles);
-            const alpha = Math.max(0, Math.min(1, 0.5 - d));
-            if (alpha > 0) {
-                const idx = (py * boxWidth + px) * 4;
-                const dx = fieldAt(x + eps, y, circles) - d;
-                const dy = fieldAt(x, y + eps, circles) - d;
-                const nz = 1.2;
+    for (let py = 0; py < canvas.height; py++) {
+        for (let px = 0; px < canvas.width; px++) {
+            const d = evaluateField(px, py, bones);
+            
+            if (d < 1.0) {
+                const idx = (py * canvas.width + px) * 4;
+                const alpha = Math.max(0, Math.min(1, 1.0 - d));
+                
+                /*
+                 * Analytical Gradient Extraction
+                 */
+                const eps = 1.0;
+                const dx = evaluateField(px + eps, py, bones) - d;
+                const dy = evaluateField(px, py + eps, bones) - d;
+                
+                const nz = 1.5;
                 const nLen = Math.hypot(dx, dy, nz);
-                const nx = dx / (nLen || 1), ny = dy / (nLen || 1), normZ = nz / (nLen || 1);
-                const lx = -0.55, ly = -0.55, lz = 0.62;
+                const nx = dx / nLen;
+                const ny = dy / nLen;
+                const normZ = nz / nLen;
+                
+                const lx = -0.5, ly = -0.5, lz = 0.8;
                 const dot = Math.max(0, nx * lx + ny * ly + normZ * lz);
-                const intensity = 0.25 + dot * 0.75;
-                const halfLen = Math.hypot(lx, ly, lz + 1.0);
-                const specDot = Math.max(0, nx * (lx / halfLen) + ny * (ly / halfLen) + normZ * ((lz + 1.0) / halfLen));
-                const specular = Math.pow(specDot, 16.0) * 0.3;
-
-                data[idx] = Math.min(255, baseR * intensity + specular * 255);
-                data[idx + 1] = Math.min(255, baseG * intensity + specular * 255);
-                data[idx + 2] = Math.min(255, baseB * intensity + specular * 255);
+                
+                const intensity = 0.2 + dot * 0.8;
+                
+                data[idx] = Math.min(255, 45 * intensity);
+                data[idx + 1] = Math.min(255, 120 * intensity);
+                data[idx + 2] = Math.min(255, 75 * intensity);
                 data[idx + 3] = alpha * 255;
             }
         }
     }
-
-    offCtx.putImageData(imgData, 0, 0);
-    ctx.drawImage(offscreen, minX, minY);
-
-    document.getElementById("ui-seed").innerText = seedValue;
-    document.getElementById("ui-segments").innerText = spineSegments;
-    document.getElementById("ui-limbs").innerText = numLimbs;
-    document.getElementById("ui-bbox").innerText = `${boxWidth}x${boxHeight} px`;
-    document.getElementById("ui-time").innerText = `${(performance.now() - startTime).toFixed(1)} ms`;
-    document.getElementById("ui-archetype").innerText = `${archetype.name} — ${archetype.tagline}`;
-    document.getElementById("ui-size").innerText = sizeClass;
-    document.getElementById("ui-diet").innerText = diet;
-    document.getElementById("ui-habitat").innerText = archetype.habitat;
-    document.getElementById("ui-temperament").innerText = temperament;
+    
+    ctx.putImageData(imgData, 0, 0);
 }
-
-window.onload = () => generateNew();

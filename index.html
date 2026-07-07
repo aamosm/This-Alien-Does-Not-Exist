@@ -1,13 +1,40 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Alien Generator Test</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procedural Alien</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        canvas {
+            background-color: #222;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            border-radius: 8px;
+        }
+    </style>
 </head>
 <body>
 
-<canvas id="c" width="1000" height="1000" style="border:1px solid black;"></canvas>
+    <canvas id="alienCanvas" width="600" height="800"></canvas>
 
-<script src="script.js"></script>
-
+    <script src="script.js"></script>
+    
+    <script>
+        window.onload = function() {
+            if (typeof renderAlien === "function") {
+                renderAlien("alienCanvas", 99451, "Cursorial");
+            } else {
+                console.error("renderAlien function not found. Check script.js.");
+            }
+        };
+    </script>
 </body>
 </html>
