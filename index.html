@@ -28,12 +28,9 @@
     <script src="script.js"></script>
     
     <script>
-        window.onload = function() {
-            if (typeof renderAlien === "function") {
-                renderAlien("alienCanvas", 99451, "Cursorial");
-            } else {
-                console.error("renderAlien function not found. Check script.js.");
-            }
+        window.onload = function () {
+            const result = renderAlien("alienCanvas", 99451);
+            console.log(result.genome, result.facts);
         };
     </script>
 </body>
