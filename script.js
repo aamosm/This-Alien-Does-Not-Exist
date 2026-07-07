@@ -25,7 +25,8 @@ function genSpine(rng, segments = 8) {
 function radiusAt(i, total, rng, maxR) {
     const t = i / (total - 1);
     const bell = Math.sin(t * Math.PI); // 0 at ends, 1 in middle
-    return 12 + bell * maxR * (0.6 + rng() * 0.4);
+    const noise = (rng() - 0.5) * 6;
+    return 10 + bell * maxR + noise;
 }
 
 function genLimb(rng, originX, originY, baseAngle) {
