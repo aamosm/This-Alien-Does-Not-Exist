@@ -193,6 +193,180 @@ function buildHead(genome, formRng, spine) {
 }
 
 /* ============================================================
+   Eye Genome — own sub-seeded stream, same pattern as skeleton/
+   limbs/skin. Adding new eye traits later never touches other
+   systems' rng sequences.
+   ============================================================ */
+function generateEyeGenome(seed, eyeCount) {
+    const rng = mulberry32(subSeed(seed, "traits-eyes"));
+    const skew = (p) => Math.pow(rng(), p);
+
+    return {
+        eyeCount,
+        clusterRadius: lerp(0.18, 0.8, rng()),
+        clusterRotation: lerp(-0.55, 0.55, skew(1.4)) * Math.PI, // mostly forward-facing, wide rotations rare
+        symmetry: lerp(0.35, 1.0, skew(0.6)),
+        eyeRadius: lerp(0.05, 0.22, rng()),
+        eyeRadiusVariation: lerp(0, 0.45, rng()),
+        irisRadius: lerp(0.5, 0.9, rng()),
+        pupilRadius: lerp(0.22, 0.6, rng()),
+        pupilShape: rng(),          // 0 = round, 1 = vertical slit — continuous, not two presets
+        eyelidTop: lerp(0, 0.4, skew(1.6)),
+        eyelidBottom: lerp(0, 0.28, skew(1.9)),
+        socketDepth: rng(),
+        eyeSpacing: lerp(0.55, 1.7, rng()),
+        eyeBulge: rng(),
+        eyeColor: rng(),
+        irisPattern: rng(),
+        highlightStrength: lerp(0.25, 1.0, rng()),
+        scleraVisible: rng() > 0.22,
+        // Deterministic phase for per-eye jitter, decoded via noise1D at
+        // render time. Keeps position/render code a pure function of the
+        // genome — no extra rng() calls needed outside this function.
+        layoutSeed: rng() * 1000,
+    };
+}
+
+/* ============================================================
+   Eye Layout — pure function of (eyeGenome, headCenter, headR).
+   Evenly-spaced points across an arc centered on the face-forward
+   angle are ALREADY mirror-symmetric by construction. So `symmetry`
+   doesn't blend between two layouts — it directly scales how much
+   per-eye noise is allowed to break that symmetry. 1.0 = perfect
+   row/ring, lower = organic scatter.
+   ============================================================ */
+function computeEyePositions(eyeGenome, headCenter, headR) {
+    const n = eyeGenome.eyeCount;
+    const positions = [];
+    if (n === 0) return positions;
+
+    const faceAngle = -Math.PI / 2 + eyeGenome.clusterRotation;
+    const arcSpan = n > 1 ? Math.min(Math.PI * 1.7, (n - 1) * 0.4 * eyeGenome.eyeSpacing) : 0;
+    const startAngle = faceAngle - arcSpan / 2;
+    const step = n > 1 ? arcSpan / (n - 1) : 0;
+    const phase = eyeGenome.layoutSeed;
+    const jitterAmt = 1 - eyeGenome.symmetry;
+
+    for (let i = 0; i < n; i++) {
+        const symmetricAngle = startAngle + i * step;
+        const angle = symmetricAngle + (noise1D(i * 12.9 + phase) - 0.5) * jitterAmt * 0.7;
+
+        const sizeJitter = 1 + (noise1D(i * 5.3 + phase + 80) - 0.5) * 2 * eyeGenome.eyeRadiusVariation;
+        const eyeR = Math.max(1.5, eyeGenome.eyeRadius * headR * sizeJitter);
+
+        const radiusJitter = 1 + (noise1D(i * 7.7 + phase + 40) - 0.5) * 0.3 * jitterAmt;
+        const rawR = eyeGenome.clusterRadius * headR * radiusJitter;
+        const r = Math.min(rawR, headR - eyeR * 0.6); // keep eye edge inside the head silhouette
+
+        positions.push({
+            x: headCenter.x + Math.cos(angle) * r,
+            y: headCenter.y + Math.sin(angle) * r * 0.85,
+            radius: eyeR
+        });
+    }
+    return positions;
+}
+
+/* ============================================================
+   Eye Rendering — layered: socket shadow -> sclera -> iris (with
+   continuous streak pattern) -> pupil (round-to-slit) -> bulge
+   rim-light -> specular highlight -> eyelid overlap.
+   ============================================================ */
+function drawEyes(ctx, eyeGenome, head, skinColorRGB) {
+    if (eyeGenome.eyeCount === 0) return;
+    const positions = computeEyePositions(eyeGenome, head.headCenter, head.headR);
+    const [sR, sG, sB] = skinColorRGB;
+    const [eR, eG, eB] = hslToRgb(eyeGenome.eyeColor * 360, 60, 45);
+
+    for (const eye of positions) {
+        const { x, y, radius } = eye;
+
+        // Socket shadow
+        if (eyeGenome.socketDepth > 0.05) {
+            ctx.save();
+            ctx.globalAlpha = eyeGenome.socketDepth * 0.5;
+            ctx.fillStyle = "rgb(0,0,0)";
+            ctx.beginPath();
+            ctx.ellipse(x, y + radius * 0.15, radius * 1.35, radius * 1.25, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Sclera
+        const irisR = eyeGenome.scleraVisible ? radius * eyeGenome.irisRadius : radius * 0.98;
+        if (eyeGenome.scleraVisible) {
+            ctx.fillStyle = `rgb(${Math.min(255, sR + 70)}, ${Math.min(255, sG + 65)}, ${Math.min(255, sB + 60)})`;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Iris
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, irisR, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.fillStyle = `rgb(${eR | 0}, ${eG | 0}, ${eB | 0})`;
+        ctx.fillRect(x - irisR, y - irisR, irisR * 2, irisR * 2);
+
+        const streakCount = Math.round(2 + eyeGenome.irisPattern * 10);
+        ctx.globalAlpha = 0.25 + eyeGenome.irisPattern * 0.35;
+        ctx.strokeStyle = `rgb(${Math.max(0, eR - 60)}, ${Math.max(0, eG - 60)}, ${Math.max(0, eB - 60)})`;
+        ctx.lineWidth = Math.max(0.6, irisR * 0.12);
+        for (let s = 0; s < streakCount; s++) {
+            const a = (s / streakCount) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + Math.cos(a) * irisR, y + Math.sin(a) * irisR);
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // Pupil 
+        const pupilR = irisR * eyeGenome.pupilRadius;
+        const squashX = lerp(1, 0.22, eyeGenome.pupilShape);
+        ctx.fillStyle = "rgb(8,8,10)";
+        ctx.beginPath();
+        ctx.ellipse(x, y, pupilR * squashX, pupilR, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Bulge rim-light
+        if (eyeGenome.eyeBulge > 0.3) {
+            ctx.save();
+            ctx.globalAlpha = (eyeGenome.eyeBulge - 0.3) * 0.5;
+            ctx.strokeStyle = "rgb(255,255,255)";
+            ctx.lineWidth = Math.max(0.8, radius * 0.08);
+            ctx.beginPath();
+            ctx.arc(x, y, radius * 0.92, Math.PI * 1.1, Math.PI * 1.9);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+
+        ctx.save();
+        ctx.globalAlpha = eyeGenome.highlightStrength;
+        ctx.fillStyle = "rgb(255,255,255)";
+        ctx.beginPath();
+        ctx.arc(x - pupilR * 0.4, y - pupilR * 0.4, Math.max(0.8, pupilR * 0.3), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Eyelids 
+        ctx.save();
+        ctx.fillStyle = `rgb(${sR | 0}, ${sG | 0}, ${sB | 0})`;
+        if (eyeGenome.eyelidTop > 0.02) {
+            const h = radius * 2 * eyeGenome.eyelidTop;
+            ctx.fillRect(x - radius * 1.05, y - radius * 1.05, radius * 2.1, h);
+        }
+        if (eyeGenome.eyelidBottom > 0.02) {
+            const h = radius * 2 * eyeGenome.eyelidBottom;
+            ctx.fillRect(x - radius * 1.05, y + radius * 1.05 - h, radius * 2.1, h);
+        }
+        ctx.restore();
+    }
+}
+
+/* ============================================================
    Skeleton Construction: Limbs
    ============================================================ */
 function buildLimbs(genome, formRng, spine) {
@@ -454,19 +628,17 @@ function classifyCreature(genome) {
     return facts;
 }
 
-/* ============================================================
-   Engine Entry Point
-   ============================================================ */
+
 function generateAlien(seed) {
     const genome = generateGenome(seed);
     const facts = classifyCreature(genome);
+    const eyes = generateEyeGenome(seed, genome.eyeCount);
     
     const formRngSpine = mulberry32(subSeed(seed, "form-spine"));
     const formRngTail = mulberry32(subSeed(seed, "form-tail"));
     const formRngHead = mulberry32(subSeed(seed, "form-head"));
     const formRngLimbs = mulberry32(subSeed(seed, "form-limbs"));
 
-    // Base origin point for geometry generation (can be translated later via fitToBounds)
     const spine = buildSpine(genome, formRngSpine, 0, 0);
     const tail = buildTail(genome, formRngTail, spine[spine.length - 1]);
     const head = buildHead(genome, formRngHead, spine);
@@ -492,6 +664,7 @@ function generateAlien(seed) {
         seed: seed,
         genome: genome,
         facts: facts,
+        eyes: eyes,
         geometry: {
             spine: spineBones,
             tail: tailBones,
@@ -506,13 +679,15 @@ function generateAlien(seed) {
     };
 }
 
-// Export module logic for external environments if applicable
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { 
         generateAlien, 
         evaluateField, 
         fitToBounds, 
-        computeBounds 
+        computeBounds,
+        generateEyeGenome,
+        computeEyePositions,
+        drawEyes
     };
 }
-

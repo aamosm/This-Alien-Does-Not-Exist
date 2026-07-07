@@ -170,13 +170,23 @@
   <script src="script.js"></script>
   <script>
     const BASE_PATH = "";
-    const SEED_LENGTH = 12;
+
+    // SEED_LENGTH and MAX_SEED are intentionally matched to the generator's
+    // actual entropy (mulberry32/subSeed operate on 32-bit state, so there
+    // are exactly 2^32 distinct creatures). Previously this was 12 digits
+    // (up to 10^12), which meant many different-looking IDs silently
+    // collided onto the same creature after ToInt32 wrapping -- undermining
+    // the "one ID = one permanent species" premise. Now every ID the UI can
+    // produce or accept maps to a genuinely distinct generator state.
+    const SEED_LENGTH = 10;
+    const MAX_SEED = 4294967295; // 2^32 - 1
 
     function normalizeSeedString(seedLike) {
       const s = String(seedLike ?? "").trim();
       const digits = s.replace(/\D/g, "");
       if (!digits) return null;
-      return digits.replace(/^0+/, "") || "0";
+      const n = Math.min(parseInt(digits, 10) || 0, MAX_SEED);
+      return String(n);
     }
 
     function displaySeed(seed) {
@@ -184,8 +194,7 @@
     }
 
     function randomSeedString() {
-      const n = Math.floor(Math.random() * 1_000_000_000_000);
-      return String(n);
+      return String(Math.floor(Math.random() * (MAX_SEED + 1)));
     }
 
     function extractSeedFromPath(pathname) {
@@ -264,17 +273,10 @@
 
       ctx.putImageData(imgData, 0, 0);
 
-      const n = alien.genome.eyeCount;
-      for (let i = 0; i < n; i++) {
-        const t = n === 1 ? 0.5 : i / (n - 1);
-        const spread = head.headR * 1.1;
-        const ex = head.headCenter.x + (t - 0.5) * spread;
-        const ey = head.headCenter.y - head.headR * 0.15;
-        ctx.fillStyle = "rgba(10,10,10,0.9)";
-        ctx.beginPath();
-        ctx.arc(ex, ey, Math.max(1.5, head.headR * 0.09), 0, Math.PI * 2);
-        ctx.fill();
-      }
+      // Full eye system: genome-driven socket/sclera/iris/pupil/eyelids,
+      // positioned from the already-scaled head. Replaces the old flat
+      // black-dot loop.
+      drawEyes(ctx, alien.eyes, head, [baseR, baseG, baseB]);
 
       return alien;
     }
