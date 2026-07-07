@@ -109,59 +109,58 @@ button:hover {
 
 <script>
 
-function formatSeed(seedStr) {
-    if (!seedStr || seedStr.trim() === '') return crypto.getRandomValues(new Uint32Array(1))[0];
+const BASE_PATH = "/This-Alien-Does-Not-Exist";
+const SEED_LENGTH = 12;
 
-    let cleanSeed = seedStr.replace(/\D/g, '');
-    
-
-    if (cleanSeed === '') return crypto.getRandomValues(new Uint32Array(1))[0];
-    
-
-    if (cleanSeed.length < 10) {
-        cleanSeed = cleanSeed.padEnd(10, '0');
-    } else if (cleanSeed.length > 10) {
-        cleanSeed = cleanSeed.substring(0, 10);
-    }
-    
-    return parseInt(cleanSeed, 10);
+function normalizeSeedString(seedLike) {
+    const s = String(seedLike ?? "").trim();
+    const digits = s.replace(/\D/g, "");
+    if (!digits) return null;
+    return digits.replace(/^0+/, "") || "0";
 }
 
-
-function getSeedFromURL() {
-    const path = window.location.pathname;
-    const lastSlashIndex = path.lastIndexOf('/');
-    const lastSegment = path.substring(lastSlashIndex + 1);
-    
-
-    const match = lastSegment.match(/\d+/);
-    if (match) {
-        return match[0];
-    }
-    return null;
+function displaySeed(seed) {
+    return seed.padStart(SEED_LENGTH, "0");
 }
 
+function randomSeedString() {
+    const n = Math.floor(Math.random() * 1_000_000_000_000);
+    return String(n);
+}
+
+function extractSeedFromPath(pathname) {
+    let p = pathname;
+
+    if (p.startsWith(BASE_PATH))
+        p = p.slice(BASE_PATH.length);
+
+    p = p.replace(/^\/+|\/+$/g, "");
+
+    if (!p) return null;
+
+    return normalizeSeedString(p.split("/")[0]);
+}
+
+function getSeedFromRedirectParam() {
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get("p");
+
+    if (!p) return null;
+
+    try {
+        const decoded = decodeURIComponent(p);
+        return extractSeedFromPath(decoded);
+    } catch {
+        return null;
+    }
+}
 function updateURL(seed) {
-    let path = window.location.pathname;
-    let segments = path.split('/');
-    let lastSegment = segments[segments.length - 1];
-
-   
-    if (/\d/.test(lastSegment)) {
-        segments[segments.length - 1] = seed;
-    } else {
- 
-        if (lastSegment === '') {
-            segments[segments.length - 1] = seed;
-        } else {
-            segments.push(seed);
-        }
-    }
-    
-    const newPath = segments.join('/');
-    window.history.pushState({ seed: seed }, '', newPath);
+    history.replaceState(
+        { seed },
+        "",
+        `${BASE_PATH}/${displaySeed(seed)}`
+    );
 }
-
 
 function renderAlien(canvasId, seed) {
     const canvas = document.getElementById(canvasId);
@@ -235,65 +234,70 @@ function renderAlien(canvasId, seed) {
 
 function newAlien(forceRandom = false, urlSeed = null) {
     document.getElementById("alienData").innerHTML = "Generating SDF... please wait.";
-    
- 
+
     setTimeout(() => {
-        let rawSeed;
+
         const inputField = document.getElementById("seedInput");
-        
+
+        let seed;
+
         if (urlSeed) {
-            rawSeed = urlSeed;
+            seed = normalizeSeedString(urlSeed);
         } else if (forceRandom) {
-            rawSeed = ""; 
-        } else if (inputField.value.trim() !== "") {
-            rawSeed = inputField.value;
+            seed = randomSeedString();
         } else {
-            rawSeed = "";
+            seed = normalizeSeedString(inputField.value);
+
+            if (!seed) {
+                seed = randomSeedString();
+            }
         }
-        
-        // Format the seed
-        const formattedSeed = formatSeed(String(rawSeed));
-        
- 
-        inputField.value = formattedSeed;
-        
 
-        updateURL(formattedSeed);
+        inputField.value = displaySeed(seed);
 
-        const alien = renderAlien("alienCanvas", formattedSeed);
+        updateURL(seed);
+
+        const alien = renderAlien("alienCanvas", seed);
 
         document.getElementById("alienData").innerHTML = `
-            <span style="color:#fff">Seed:</span> ${alien.seed} &nbsp;|&nbsp; 
-            <span style="color:#fff">Size:</span> ${alien.facts.size} &nbsp;|&nbsp; 
+            <span style="color:#fff">Seed:</span> ${displaySeed(seed)} &nbsp;|&nbsp;
+            <span style="color:#fff">Size:</span> ${alien.facts.size} &nbsp;|&nbsp;
             <span style="color:#fff">Diet:</span> ${alien.facts.diet}<br>
-            <span style="color:#fff">Locomotion:</span> ${alien.facts.locomotion} &nbsp;|&nbsp; 
+            <span style="color:#fff">Locomotion:</span> ${alien.facts.locomotion} &nbsp;|&nbsp;
             <span style="color:#fff">Temperament:</span> ${alien.facts.temperament}
         `;
+
     }, 50);
 }
 
 window.onload = () => {
-    const urlSeed = getSeedFromURL();
+    const urlSeed =
+        extractSeedFromPath(window.location.pathname) ||
+        getSeedFromRedirectParam();
+
     if (urlSeed) {
         newAlien(false, urlSeed);
     } else {
         newAlien(true);
     }
 };
-
 window.onpopstate = function(event) {
+
     if (event.state && event.state.seed) {
         newAlien(false, event.state.seed);
+        return;
+    }
+
+    const urlSeed =
+        extractSeedFromPath(window.location.pathname) ||
+        getSeedFromRedirectParam();
+
+    if (urlSeed) {
+        newAlien(false, urlSeed);
     } else {
-        const urlSeed = getSeedFromURL();
-        if(urlSeed) {
-             newAlien(false, urlSeed);
-        } else {
-             newAlien(true);
-        }
+        newAlien(true);
     }
 };
-
 document.getElementById('generateBtn').addEventListener('click', () => newAlien(false));
 
 
