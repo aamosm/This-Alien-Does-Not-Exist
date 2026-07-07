@@ -1,6 +1,6 @@
 /* ============================================================
-   PRNG — canonical mulberry32
-   ============================================================ */
+    PRNG — canonical mulberry32
+    ============================================================ */
 function mulberry32(a) {
     return function () {
         var t = a += 0x6D2B79F5;
@@ -10,11 +10,7 @@ function mulberry32(a) {
     }
 }
 
-// Deterministically derive an independent sub-seed from a master seed + a
-// label. This is how "stable gene order" actually gets enforced: instead of
-// one shared rng() stream (where adding a gene shifts everything after it),
-// each anatomical system gets its OWN stream. Add a "feathers" system later
-// and every existing creature's skeleton/limbs/skin are completely unaffected.
+// Deterministically derive an independent sub-seed from a master seed + a label
 function subSeed(masterSeed, salt) {
     let h = (masterSeed ^ 0) >>> 0;
     for (let i = 0; i < salt.length; i++) {
@@ -26,10 +22,8 @@ function subSeed(masterSeed, salt) {
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 /* ============================================================
-   Noise utilities (fixed a bug from the reference doc: noise1D
-   was doing Math.floor(n) instead of Math.floor(x) — n doesn't
-   exist in that scope, would've thrown ReferenceError)
-   ============================================================ */
+    Noise utilities
+    ============================================================ */
 function hash11(n) {
     n = Math.sin(n) * 43758.5453;
     return n - Math.floor(n);
@@ -44,14 +38,13 @@ function noise1D(x) {
 }
 
 /* ============================================================
-   GENOME — pure data, no archetypes. Each anatomical group reads
-   from its own sub-seeded stream, in fixed order within that group.
-   ============================================================ */
+    GENOME
+    ============================================================ */
 function rollEyeCount(rng) {
     const r = rng();
-    if (r < 0.95) return 2;            // vast majority: two eyes
-    if (r < 0.99) return 4;            // rare
-    return 6 + Math.floor(rng() * 3);  // very rare, 6-8
+    if (r < 0.95) return 2;
+    if (r < 0.99) return 4;
+    return 6 + Math.floor(rng() * 3);
 }
 function rollHornCount(rng) {
     const r = rng();
@@ -62,54 +55,45 @@ function rollHornCount(rng) {
 }
 function rollLimbPairs(rng) {
     const r = rng();
-    if (r < 0.05) return 0;  // legless — rare
-    if (r < 0.75) return 2;  // four legs — most common
-    if (r < 0.95) return 1;  // two legs
-    return 3;                // six legs — rare
+    if (r < 0.05) return 0;
+    if (r < 0.75) return 2;
+    if (r < 0.95) return 1;
+    return 3;
 }
 
 function generateGenome(seed) {
-    const skRng   = mulberry32(subSeed(seed, "traits-skeleton"));
+    const skRng = mulberry32(subSeed(seed, "traits-skeleton"));
     const limbRng = mulberry32(subSeed(seed, "traits-limbs"));
     const headRng = mulberry32(subSeed(seed, "traits-head"));
     const skinRng = mulberry32(subSeed(seed, "traits-skin"));
 
-    const skew = (rng, p) => Math.pow(rng(), p); // p>1 biases low/common, p<1 biases high/rare
+    const skew = (rng, p) => Math.pow(rng(), p);
 
-    const genome = {
-        // -- skeleton --
-        mass: lerp(500, 50000, skew(skRng, 2.2)),   // big creatures genuinely rare
+    return {
+        mass: lerp(500, 50000, skew(skRng, 2.2)),
         bodyLength: lerp(0.8, 3.5, skRng()),
         bodyWidth: lerp(0.3, 2.2, skRng()),
         neckLength: lerp(0, 2.5, skew(skRng, 1.6)),
         tailLength: lerp(0, 4.0, skew(skRng, 1.4)),
         spineCurve: lerp(-0.8, 0.8, skRng()),
         bodyTaper: lerp(0.5, 1.5, skRng()),
-
-        // -- limbs --
         limbPairs: rollLimbPairs(limbRng),
         limbSegments: Math.floor(lerp(2, 5, limbRng())),
         legLength: lerp(0.2, 3.0, skew(limbRng, 1.5)),
         footSpread: lerp(0.5, 3.5, limbRng()),
         stance: limbRng(),
-
-        // -- head --
         headSize: lerp(0.2, 2.0, headRng()),
         eyeCount: rollEyeCount(headRng),
         hornCount: rollHornCount(headRng),
-
-        // -- skin --
         skinHue: skinRng(),
         skinBrightness: skinRng(),
         skinPattern: skinRng(),
     };
-    return genome;
 }
 
 /* ============================================================
-   SKELETON CONSTRUCTION — organic spine (bounded taper + noise
-   wobble, per the "rounded not pointy" fixes), tail, head+horns
-   ============================================================ */
+    SKELETON CONSTRUCTION
+    ============================================================ */
 function buildSpine(genome, formRng, startX, startY) {
     const sizeScale = Math.pow(genome.mass / 5000, 0.28);
     const totalLen = (60 + genome.bodyLength * 90) * sizeScale;
@@ -131,7 +115,6 @@ function buildSpine(genome, formRng, startX, startY) {
         const x = startX + bend + wobble * 0.4;
         const y = startY + t * totalLen;
 
-        // bounded taper (never goes to 0) + noise instead of a clean bell curve
         const taper = 1 - Math.pow(t, genome.bodyTaper) * 0.75;
         const rNoise = noise1D(t * 4 + phase + 50) * 2 - 1;
         const r = Math.max(baseRadius * 0.25, baseRadius * taper * (1 + rNoise * 0.25));
@@ -142,8 +125,8 @@ function buildSpine(genome, formRng, startX, startY) {
 }
 
 function buildTail(genome, formRng, lastNode) {
-    if (genome.tailLength < 0.15) return []; // negligible tail: skip it entirely
-    const sizeScale = Math.pow(genome.mass / 5000, 0.28); // was missing — tail wasn't scaling with body size
+    if (genome.tailLength < 0.15) return [];
+    const sizeScale = Math.pow(genome.mass / 5000, 0.28);
     const segs = 2 + Math.round(genome.tailLength * 2);
     const segLen = 30 * genome.tailLength * sizeScale;
     let x = lastNode.x, y = lastNode.y, r = lastNode.r * 0.7;
@@ -153,7 +136,7 @@ function buildTail(genome, formRng, lastNode) {
         angle += (formRng() - 0.5) * 0.5;
         x += Math.cos(angle) * segLen * 0.2 + (formRng() - 0.5) * 4 * sizeScale;
         y += segLen;
-        r *= 0.85; // was 0.72 — tapered to a hairline within a couple segments
+        r *= 0.85;
         nodes.push({ x, y, r: Math.max(2, r) });
     }
     return nodes;
@@ -166,8 +149,8 @@ function buildHead(genome, formRng, spine) {
     const hx = bodyTop.x, hy = bodyTop.y - neckLen;
 
     const bones = [
-        { ax: hx, ay: hy, bx: bodyTop.x, by: bodyTop.y, r1: headR * 0.55, r2: bodyTop.r }, // neck
-        { ax: hx, ay: hy - headR * 0.3, bx: hx, by: hy + headR * 0.3, r1: headR, r2: headR } // head blob
+        { ax: hx, ay: hy, bx: bodyTop.x, by: bodyTop.y, r1: headR * 0.55, r2: bodyTop.r },
+        { ax: hx, ay: hy - headR * 0.3, bx: hx, by: hy + headR * 0.3, r1: headR, r2: headR }
     ];
 
     for (let i = 0; i < genome.hornCount; i++) {
@@ -178,7 +161,6 @@ function buildHead(genome, formRng, spine) {
         const by = hy + Math.sin(angle) * len - headR * 0.3;
         bones.push({ ax: hx, ay: hy - headR * 0.3, bx, by, r1: headR * 0.18, r2: headR * 0.05 });
     }
-
     return { bones, headCenter: { x: hx, y: hy }, headR };
 }
 
@@ -200,30 +182,25 @@ function buildLimbs(genome, formRng, spine) {
             const chain = [{ x: attach.x, y: attach.y }];
             let cx = attach.x, cy = attach.y;
             const segLen = legLenPx / segCount;
+            
             for (let s = 0; s < segCount; s++) {
                 cx += side * genome.footSpread * (segLen * 0.15);
                 cy += segLen;
                 chain.push({ x: cx, y: cy });
             }
 
-            // softer, organic IK targets instead of a straight harsh reach
-            let spreadX = genome.footSpread * (0.5 + formRng() * 0.4);
-            let dirY = 0.6 + genome.stance * 0.8;
+            let spreadX = genome.footSpread * (0.10 + formRng() * 0.30);
+            let dirY = 0.28 + genome.stance * 0.34;
 
-            // Clamp the target vector so it stays WITHIN the leg's reach.
-            // Otherwise distToTarget >= totalLength almost always, and
-            // solveFABRIK falls into its "fully stretched straight line"
-            // branch instead of actually bending the chain — that's what
-            // was producing the rigid spikes instead of jointed legs.
-            const maxReach = 0.85; // fraction of legLenPx the foot may sit at
+            const maxReach = 0.85; 
             const mag = Math.hypot(spreadX, dirY);
             if (mag > maxReach) {
                 spreadX = spreadX / mag * maxReach;
                 dirY = dirY / mag * maxReach;
             }
 
-            const forwardBias = (formRng() - 0.5) * legLenPx * 0.15;
-            const heightJitter = (noise1D(p * 10 + side * 5 + formRng() * 100) - 0.5) * legLenPx * 0.15;
+            const forwardBias = (formRng() - 0.5) * legLenPx * 0.25;
+            const heightJitter = (noise1D(p * 10 + side * 5 + formRng() * 100) - 0.5) * legLenPx * 0.25;
 
             const targetX = attach.x + (spreadX * legLenPx + forwardBias) * side;
             const targetY = attach.y + dirY * legLenPx + heightJitter;
@@ -242,8 +219,8 @@ function buildLimbs(genome, formRng, spine) {
 }
 
 /* ============================================================
-   FABRIK — unchanged, your version is correct
-   ============================================================ */
+    FABRIK IK SOLVER
+    ============================================================ */
 function solveFABRIK(chain, targetX, targetY) {
     const n = chain.length;
     const lengths = [];
@@ -285,29 +262,110 @@ function solveFABRIK(chain, targetX, targetY) {
     }
 }
 
-/* ============================================================
-   SDF — uneven capsule + cubic smin, unchanged except k is now
-   softer (22-30 range) per the organic-shape fixes
-   ============================================================ */
-function sdUnevenCapsule(px, py, ax, ay, bx, by, r1, r2) {
-    const h = Math.hypot(bx - ax, by - ay);
-    if (h === 0) return Math.hypot(px - ax, py - ay) - r1;
-    const dirX = (bx - ax) / h, dirY = (by - ay) / h;
-    const tx = px - ax, ty = py - ay;
-    const localY = tx * dirX + ty * dirY;
-    const localX = tx * -dirY + ty * dirX;
-    const pX = Math.abs(localX), pY = localY;
-    const b = (r1 - r2) / h;
-    const a = Math.sqrt(Math.max(0.0, 1.0 - b * b));
-    const k = pX * a - pY * b;
-    if (k < 0.0) return Math.hypot(pX, pY) - r1;
-    if (k > a * h) return Math.hypot(pX, pY - h) - r2;
-    return pX * a + pY * b - r1;
+
+function computeBounds(bones) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (let b of bones) {
+        const r = Math.max(b.r1, b.r2);
+        if (b.ax - r < minX) minX = b.ax - r;
+        if (b.ax + r > maxX) maxX = b.ax + r;
+        if (b.ay - r < minY) minY = b.ay - r;
+        if (b.ay + r > maxY) maxY = b.ay + r;
+        
+        if (b.bx - r < minX) minX = b.bx - r;
+        if (b.bx + r > maxX) maxX = b.bx + r;
+        if (b.by - r < minY) minY = b.by - r;
+        if (b.by + r > maxY) maxY = b.by + r;
+    }
+    return { minX, minY, maxX, maxY };
 }
+
+function fitToCanvas(bones, head, canvasW, canvasH, padding) {
+    const bounds = computeBounds(bones);
+    const w = bounds.maxX - bounds.minX;
+    const h = bounds.maxY - bounds.minY;
+    const scale = Math.min((canvasW - padding * 2) / (w || 1), (canvasH - padding * 2) / (h || 1));
+    
+    const cx = (bounds.minX + bounds.maxX) / 2;
+    const cy = (bounds.minY + bounds.maxY) / 2;
+    
+    const dx = canvasW / 2 - cx * scale;
+    const dy = canvasH / 2 - cy * scale;
+    
+    for (let b of bones) {
+        b.ax = b.ax * scale + dx;
+        b.ay = b.ay * scale + dy;
+        b.bx = b.bx * scale + dx;
+        b.by = b.by * scale + dy;
+        b.r1 *= scale;
+        b.r2 *= scale;
+    }
+    
+    head.headCenter.x = head.headCenter.x * scale + dx;
+    head.headCenter.y = head.headCenter.y * scale + dy;
+    head.headR *= scale;
+    
+    return scale;
+}
+
+
+function sdUnevenCapsule(px, py, ax, ay, bx, by, r1, r2) {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const L = Math.sqrt(dx * dx + dy * dy);
+
+    if (L === 0) {
+        const dpx = px - ax, dpy = py - ay;
+        return Math.sqrt(dpx * dpx + dpy * dpy) - Math.max(r1, r2);
+    }
+    
+
+    if (L <= Math.abs(r1 - r2)) {
+        if (r1 > r2) {
+            const dpx = px - ax, dpy = py - ay;
+            return Math.sqrt(dpx * dpx + dpy * dpy) - r1;
+        } else {
+            const dpx = px - bx, dpy = py - by;
+            return Math.sqrt(dpx * dpx + dpy * dpy) - r2;
+        }
+    }
+
+    // Direction from A to B
+    const dirX = dx / L;
+    const dirY = dy / L;
+    
+    // Point translated to origin A
+    const tx = px - ax;
+    const ty = py - ay;
+    
+
+    const y = tx * dirX + ty * dirY; 
+    const x = Math.abs(tx * -dirY + ty * dirX); 
+    
+    // Calculate the angle of the cone wall
+    const sinT = (r1 - r2) / L;
+    const cosT = Math.sqrt(Math.max(0.0, 1.0 - sinT * sinT));
+    
+    const proj = y * cosT - x * sinT;
+    
+    if (proj <= 0.0) {
+    
+        return Math.sqrt(x * x + y * y) - r1;
+    }
+    if (proj >= L * cosT) {
+   
+        const yL = y - L;
+        return Math.sqrt(x * x + yL * yL) - r2;
+    }
+    
+    return x * cosT + y * sinT - r1;
+}
+
 function sminCubic(a, b, k) {
     const h = Math.max(0, Math.min(1, 0.5 + 0.5 * (b - a) / k));
     return b + (a - b) * h - k * h * (1.0 - h);
 }
+
 function evaluateField(px, py, bones, k) {
     if (bones.length === 0) return Infinity;
     let d = sdUnevenCapsule(px, py, bones[0].ax, bones[0].ay, bones[0].bx, bones[0].by, bones[0].r1, bones[0].r2);
@@ -320,8 +378,8 @@ function evaluateField(px, py, bones, k) {
 }
 
 /* ============================================================
-   COLOR
-   ============================================================ */
+    COLOR & CLASSIFICATION
+    ============================================================ */
 function hslToRgb(h, s, l) {
     s /= 100; l /= 100;
     const k = n => (n + h / 30) % 12;
@@ -336,21 +394,16 @@ function computeSkinColor(genome) {
     return hslToRgb(hue, sat, light);
 }
 
-/* ============================================================
-   EMERGENT CLASSIFICATION — describes what the genome produced,
-   AFTER the fact. Consumes zero rng calls, pure function of
-   genome, so it can never desync generation.
-   ============================================================ */
 function classifyCreature(genome) {
     const facts = {};
     const legRatio = genome.legLength / genome.bodyLength;
     const isHeavy = genome.mass > 20000;
     const isLegless = genome.limbPairs === 0;
 
-    if (isLegless && genome.tailLength > 1.5) facts.locomotion = "Serpentine / Aquatic";
-    else if (isHeavy && legRatio < 1.0) facts.locomotion = "Graviportal (heavy-bodied)";
-    else if (legRatio > 1.6 && genome.mass < 8000) facts.locomotion = "Cursorial (built for speed)";
-    else if (genome.limbPairs >= 3) facts.locomotion = "Many-limbed crawler";
+    if (isLegless && genome.tailLength > 1.5) facts.locomotion = "Serpentine";
+    else if (isHeavy && legRatio < 1.0) facts.locomotion = "Graviportal";
+    else if (legRatio > 1.6 && genome.mass < 8000) facts.locomotion = "Cursorial";
+    else if (genome.limbPairs >= 3) facts.locomotion = "Crawler";
     else facts.locomotion = "Generalist";
 
     if (genome.mass < 2000) facts.size = "Small";
@@ -361,8 +414,6 @@ function classifyCreature(genome) {
     if (genome.hornCount >= 2 && genome.mass > 10000) facts.diet = "Herbivore";
     else if (genome.eyeCount >= 4) facts.diet = "Carnivore";
     else facts.diet = "Omnivore";
-
-    facts.habitat = isLegless ? "Aquatic / Subsurface" : legRatio > 1.5 ? "Open terrain" : "Mixed terrain";
 
     const temperaments = ["Docile", "Territorial", "Skittish", "Curious", "Aggressive", "Solitary"];
     const idx = Math.floor(((genome.stance + genome.skinPattern) / 2) * temperaments.length) % temperaments.length;
@@ -385,20 +436,28 @@ function drawEyes(ctx, genome, headCenter, headR) {
     }
 }
 
+/* ============================================================
+    RENDER PIPELINE
+    ============================================================ */
 function renderAlien(canvasId, seed) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return null;
     const ctx = canvas.getContext("2d");
+    
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const genome = generateGenome(seed);
     const facts = classifyCreature(genome);
-    const formRng = mulberry32(subSeed(seed, "form"));
+    
+    const formRngSpine = mulberry32(subSeed(seed, "form-spine"));
+    const formRngTail = mulberry32(subSeed(seed, "form-tail"));
+    const formRngHead = mulberry32(subSeed(seed, "form-head"));
+    const formRngLimbs = mulberry32(subSeed(seed, "form-limbs"));
 
-    const spine = buildSpine(genome, formRng, canvas.width / 2, 120);
-    const tail = buildTail(genome, formRng, spine[spine.length - 1]);
-    const head = buildHead(genome, formRng, spine);
-    const limbBones = buildLimbs(genome, formRng, spine);
+    const spine = buildSpine(genome, formRngSpine, canvas.width/2, 120);
+    const tail = buildTail(genome, formRngTail, spine[spine.length - 1]);
+    const head = buildHead(genome, formRngHead, spine);
+    const limbBones = buildLimbs(genome, formRngLimbs, spine);
 
     const spineBones = [];
     for (let i = 0; i < spine.length - 1; i++) {
@@ -412,8 +471,14 @@ function renderAlien(canvasId, seed) {
     }
 
     const allBones = [...spineBones, ...tailBones, ...head.bones, ...limbBones];
+    
+    fitToCanvas(allBones, head, canvas.width, canvas.height, 60);
+
     const [baseR, baseG, baseB] = computeSkinColor(genome);
-    const k = 22 + formRng() * 8; // softer blending, 22-30
+    
+    const globalFormRng = mulberry32(subSeed(seed, "form-global"));
+    const baseThickness = allBones[0].r1;
+    const k = baseThickness * (0.5 + globalFormRng() * 0.3);
 
     const imgData = ctx.createImageData(canvas.width, canvas.height);
     const data = imgData.data;
@@ -431,6 +496,7 @@ function renderAlien(canvasId, seed) {
                 const nz = 1.5;
                 const nLen = Math.hypot(dx, dy, nz);
                 const nx = dx / nLen, ny = dy / nLen, normZ = nz / nLen;
+                
                 const lx = -0.5, ly = -0.5, lz = 0.8;
                 const dot = Math.max(0, nx * lx + ny * ly + normZ * lz);
                 const intensity = 0.25 + dot * 0.75;
@@ -445,9 +511,26 @@ function renderAlien(canvasId, seed) {
     ctx.putImageData(imgData, 0, 0);
     drawEyes(ctx, genome, head.headCenter, head.headR);
 
-    return { genome, facts };
+    return { genome, facts, seed };
 }
 
-function generateRandom(canvasId) {
-    return renderAlien(canvasId, Math.floor(Math.random() * 4294967296));
+// Setup interaction
+function rollNew() {
+    document.getElementById('alienData').innerHTML = "Generating SDF... please wait.";
+    setTimeout(() => {
+        const seed = Math.floor(Math.random() * 4294967296);
+        const result = renderAlien("alienCanvas", seed);
+        
+        const facts = result.facts;
+        document.getElementById('alienData').innerHTML = `
+            <div style="margin-bottom:8px">Seed: <strong>${seed}</strong></div>
+            <span class="tag">${facts.size}</span>
+            <span class="tag">${facts.locomotion}</span>
+            <span class="tag">${facts.diet}</span>
+            <span class="tag">${facts.temperament}</span>
+        `;
+    }, 50);
 }
+
+window.onload = rollNew;
+document.getElementById('alienCanvas').addEventListener('click', rollNew);
