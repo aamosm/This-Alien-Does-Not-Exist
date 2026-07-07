@@ -6,76 +6,310 @@
 <title>This Alien Doesn't Exist</title>
 
 <style>
-body{
-    margin:40px;
-    background:#111;
-    color:#eee;
-    font-family:Arial,Helvetica,sans-serif;
+body {
+    margin: 0;
+    background: #0a0a0a;
+    color: #888;
+    font-family: system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
 }
 
-h1{
-    margin-top:0;
+canvas {
+    width: 700px;
+    height: 700px;
+    background: #161616;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    cursor: pointer;
+    transition: transform 0.1s;
 }
 
-canvas{
-    border:1px solid #555;
-    background:#222;
-    display:block;
-    margin-bottom:20px;
+canvas:active {
+    transform: scale(0.99);
 }
 
-table{
-    border-collapse:collapse;
+.bottom-panel {
+    width: 700px;
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
 }
 
-td{
-    padding:6px 12px;
-    border-bottom:1px solid #333;
+#alienData {
+    line-height: 1.6;
+    font-family: monospace;
+    font-size: 14px;
+    color: #aaa;
 }
 
-td:first-child{
-    font-weight:bold;
+.controls {
+    display: flex;
+    gap: 8px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.controls:hover {
+    opacity: 1;
+}
+
+input {
+    padding: 8px 12px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #aaa;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 13px;
+    width: 140px;
+    outline: none;
+}
+
+input:focus {
+    border-color: #555;
+}
+
+button {
+    padding: 8px 12px;
+    background: #222;
+    color: #aaa;
+    border: 1px solid #333;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.2s, color 0.2s;
+}
+
+button:hover {
+    background: #333;
+    color: #fff;
 }
 </style>
 </head>
 
 <body>
 
-<h1>This Alien Doesn't Exist</h1>
+<canvas id="alienCanvas" width="700" height="700" title="Click to generate random"></canvas>
 
-<canvas id="alienCanvas" width="700" height="700"></canvas>
-
-<table id="traits"></table>
+<div class="bottom-panel">
+    <div id="alienData">Loading engine...</div>
+    
+    <div class="controls">
+        <input type="text" id="seedInput" placeholder="Custom Seed...">
+        <button id="generateBtn">Load</button>
+    </div>
+</div>
 
 <script src="script.js"></script>
 
 <script>
-const seed = crypto.getRandomValues(new Uint32Array(1))[0];
 
-const alien = generateAlien(seed);
+function formatSeed(seedStr) {
+    if (!seedStr || seedStr.trim() === '') return crypto.getRandomValues(new Uint32Array(1))[0];
 
-const traits = document.getElementById("traits");
+    let cleanSeed = seedStr.replace(/\D/g, '');
+    
 
-traits.innerHTML = `
-<tr><td>Seed</td><td>${alien.seed}</td></tr>
+    if (cleanSeed === '') return crypto.getRandomValues(new Uint32Array(1))[0];
+    
 
-<tr><td>Size</td><td>${alien.facts.size}</td></tr>
-<tr><td>Locomotion</td><td>${alien.facts.locomotion}</td></tr>
-<tr><td>Diet</td><td>${alien.facts.diet}</td></tr>
-<tr><td>Temperament</td><td>${alien.facts.temperament}</td></tr>
+    if (cleanSeed.length < 10) {
+        cleanSeed = cleanSeed.padEnd(10, '0');
+    } else if (cleanSeed.length > 10) {
+        cleanSeed = cleanSeed.substring(0, 10);
+    }
+    
+    return parseInt(cleanSeed, 10);
+}
 
-<tr><td>Mass</td><td>${alien.genome.mass.toFixed(0)}</td></tr>
-<tr><td>Body Length</td><td>${alien.genome.bodyLength.toFixed(2)}</td></tr>
-<tr><td>Body Width</td><td>${alien.genome.bodyWidth.toFixed(2)}</td></tr>
-<tr><td>Neck Length</td><td>${alien.genome.neckLength.toFixed(2)}</td></tr>
-<tr><td>Tail Length</td><td>${alien.genome.tailLength.toFixed(2)}</td></tr>
-<tr><td>Limb Pairs</td><td>${alien.genome.limbPairs}</td></tr>
-<tr><td>Limb Segments</td><td>${alien.genome.limbSegments}</td></tr>
-<tr><td>Leg Length</td><td>${alien.genome.legLength.toFixed(2)}</td></tr>
-<tr><td>Eyes</td><td>${alien.genome.eyeCount}</td></tr>
-<tr><td>Horns</td><td>${alien.genome.hornCount}</td></tr>
-`;
+
+function getSeedFromURL() {
+    const path = window.location.pathname;
+    const lastSlashIndex = path.lastIndexOf('/');
+    const lastSegment = path.substring(lastSlashIndex + 1);
+    
+
+    const match = lastSegment.match(/\d+/);
+    if (match) {
+        return match[0];
+    }
+    return null;
+}
+
+function updateURL(seed) {
+    let path = window.location.pathname;
+    let segments = path.split('/');
+    let lastSegment = segments[segments.length - 1];
+
+   
+    if (/\d/.test(lastSegment)) {
+        segments[segments.length - 1] = seed;
+    } else {
+ 
+        if (lastSegment === '') {
+            segments[segments.length - 1] = seed;
+        } else {
+            segments.push(seed);
+        }
+    }
+    
+    const newPath = segments.join('/');
+    window.history.pushState({ seed: seed }, '', newPath);
+}
+
+
+function renderAlien(canvasId, seed) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return null;
+    const ctx = canvas.getContext("2d");
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Ensure seed is a number for the engine
+    const numSeed = parseInt(seed, 10);
+
+
+    const alien = generateAlien(numSeed);
+    
+    const allBones = alien.geometry.allBones;
+    const head = alien.geometry.head;
+    const [baseR, baseG, baseB] = alien.materials.baseColorRGB;
+
+
+    const scale = fitToBounds(allBones, head, canvas.width, canvas.height, 60);
+
+
+    const k = alien.materials.smoothingK * scale;
+
+
+    const imgData = ctx.createImageData(canvas.width, canvas.height);
+    const data = imgData.data;
+    const eps = 1.0;
+
+    for (let py = 0; py < canvas.height; py++) {
+        for (let px = 0; px < canvas.width; px++) {
+            const d = evaluateField(px, py, allBones, k);
+            if (d < 1.0) {
+                const idx = (py * canvas.width + px) * 4;
+                const alpha = Math.max(0, Math.min(1, 1.0 - d));
+
+                const dx = evaluateField(px + eps, py, allBones, k) - d;
+                const dy = evaluateField(px, py + eps, allBones, k) - d;
+                const nz = 1.5;
+                const nLen = Math.hypot(dx, dy, nz);
+                const nx = dx / nLen, ny = dy / nLen, normZ = nz / nLen;
+                
+                const lx = -0.5, ly = -0.5, lz = 0.8;
+                const dot = Math.max(0, nx * lx + ny * ly + normZ * lz);
+                const intensity = 0.25 + dot * 0.75;
+
+                data[idx] = Math.min(255, baseR * intensity);
+                data[idx + 1] = Math.min(255, baseG * intensity);
+                data[idx + 2] = Math.min(255, baseB * intensity);
+                data[idx + 3] = alpha * 255;
+            }
+        }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    
+// drawing eyes
+    const n = alien.genome.eyeCount;
+    for (let i = 0; i < n; i++) {
+        const t = n === 1 ? 0.5 : i / (n - 1);
+        const spread = head.headR * 1.1;
+        const ex = head.headCenter.x + (t - 0.5) * spread;
+        const ey = head.headCenter.y - head.headR * 0.15;
+        ctx.fillStyle = "rgba(10,10,10,0.9)";
+        ctx.beginPath();
+        ctx.arc(ex, ey, Math.max(1.5, head.headR * 0.09), 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    return alien;
+}
+
+function newAlien(forceRandom = false, urlSeed = null) {
+    document.getElementById("alienData").innerHTML = "Generating SDF... please wait.";
+    
+ 
+    setTimeout(() => {
+        let rawSeed;
+        const inputField = document.getElementById("seedInput");
+        
+        if (urlSeed) {
+            rawSeed = urlSeed;
+        } else if (forceRandom) {
+            rawSeed = ""; 
+        } else if (inputField.value.trim() !== "") {
+            rawSeed = inputField.value;
+        } else {
+            rawSeed = "";
+        }
+        
+        // Format the seed
+        const formattedSeed = formatSeed(String(rawSeed));
+        
+ 
+        inputField.value = formattedSeed;
+        
+
+        updateURL(formattedSeed);
+
+        const alien = renderAlien("alienCanvas", formattedSeed);
+
+        document.getElementById("alienData").innerHTML = `
+            <span style="color:#fff">Seed:</span> ${alien.seed} &nbsp;|&nbsp; 
+            <span style="color:#fff">Size:</span> ${alien.facts.size} &nbsp;|&nbsp; 
+            <span style="color:#fff">Diet:</span> ${alien.facts.diet}<br>
+            <span style="color:#fff">Locomotion:</span> ${alien.facts.locomotion} &nbsp;|&nbsp; 
+            <span style="color:#fff">Temperament:</span> ${alien.facts.temperament}
+        `;
+    }, 50);
+}
+
+window.onload = () => {
+    const urlSeed = getSeedFromURL();
+    if (urlSeed) {
+        newAlien(false, urlSeed);
+    } else {
+        newAlien(true);
+    }
+};
+
+window.onpopstate = function(event) {
+    if (event.state && event.state.seed) {
+        newAlien(false, event.state.seed);
+    } else {
+        const urlSeed = getSeedFromURL();
+        if(urlSeed) {
+             newAlien(false, urlSeed);
+        } else {
+             newAlien(true);
+        }
+    }
+};
+
+document.getElementById('generateBtn').addEventListener('click', () => newAlien(false));
+
+
+document.getElementById('seedInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        newAlien(false);
+        this.blur(); // Remove focus to hide mobile keyboards
+    }
+});
+
+document.getElementById('alienCanvas').addEventListener('click', () => {
+    document.getElementById('seedInput').value = "";
+    newAlien(true);
+});
+
 </script>
-
 </body>
 </html>
