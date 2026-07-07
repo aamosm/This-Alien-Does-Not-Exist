@@ -169,7 +169,9 @@
 
   <script src="script.js"></script>
   <script>
-    const BASE_PATH = "/This-Alien-Does-Not-Exist";
+    const BASE_PATH = window.location.pathname
+    .replace(/\/+$/, "")
+    .replace(/\/[^/]*$/, "");
     const SEED_LENGTH = 12;
 
     function normalizeSeedString(seedLike) {
