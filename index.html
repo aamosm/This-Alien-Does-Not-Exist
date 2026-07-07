@@ -1,37 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procedural Alien</title>
-    <style>
-        body {
-            margin: 0;
-            background-color: #111;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-        canvas {
-            background-color: #222;
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
-            border-radius: 8px;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>This Alien Doesn't Exist</title>
+
+<style>
+body{
+    margin:40px;
+    background:#111;
+    color:#eee;
+    font-family:Arial,Helvetica,sans-serif;
+}
+
+h1{
+    margin-top:0;
+}
+
+canvas{
+    border:1px solid #555;
+    background:#222;
+    display:block;
+    margin-bottom:20px;
+}
+
+table{
+    border-collapse:collapse;
+}
+
+td{
+    padding:6px 12px;
+    border-bottom:1px solid #333;
+}
+
+td:first-child{
+    font-weight:bold;
+}
+</style>
 </head>
+
 <body>
 
-    <canvas id="alienCanvas" width="600" height="800"></canvas>
+<h1>This Alien Doesn't Exist</h1>
 
-    <script src="script.js"></script>
-    
-    <script>
-        window.onload = function () {
-            const result = renderAlien("alienCanvas", 99452);
-            console.log(result.genome, result.facts);
-        };
-    </script>
+<canvas id="alienCanvas" width="700" height="700"></canvas>
+
+<table id="traits"></table>
+
+<script src="script.js"></script>
+
+<script>
+const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+
+const alien = generateAlien(seed);
+
+const traits = document.getElementById("traits");
+
+traits.innerHTML = `
+<tr><td>Seed</td><td>${alien.seed}</td></tr>
+
+<tr><td>Size</td><td>${alien.facts.size}</td></tr>
+<tr><td>Locomotion</td><td>${alien.facts.locomotion}</td></tr>
+<tr><td>Diet</td><td>${alien.facts.diet}</td></tr>
+<tr><td>Temperament</td><td>${alien.facts.temperament}</td></tr>
+
+<tr><td>Mass</td><td>${alien.genome.mass.toFixed(0)}</td></tr>
+<tr><td>Body Length</td><td>${alien.genome.bodyLength.toFixed(2)}</td></tr>
+<tr><td>Body Width</td><td>${alien.genome.bodyWidth.toFixed(2)}</td></tr>
+<tr><td>Neck Length</td><td>${alien.genome.neckLength.toFixed(2)}</td></tr>
+<tr><td>Tail Length</td><td>${alien.genome.tailLength.toFixed(2)}</td></tr>
+<tr><td>Limb Pairs</td><td>${alien.genome.limbPairs}</td></tr>
+<tr><td>Limb Segments</td><td>${alien.genome.limbSegments}</td></tr>
+<tr><td>Leg Length</td><td>${alien.genome.legLength.toFixed(2)}</td></tr>
+<tr><td>Eyes</td><td>${alien.genome.eyeCount}</td></tr>
+<tr><td>Horns</td><td>${alien.genome.hornCount}</td></tr>
+`;
+</script>
+
 </body>
 </html>

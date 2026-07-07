@@ -1,6 +1,9 @@
 /* ============================================================
-    PRNG — canonical mulberry32
-    ============================================================ */
+   PRNG (Mulberry32)
+   Study/Source: Mulberry32 algorithm by Tommy Ettinger (2017). 
+   Constant 0x6D2B79F5 is a Weyl sequence increment derived from 
+   the golden ratio to ensure strict uniform distribution.
+   ============================================================ */
 function mulberry32(a) {
     return function () {
         var t = a += 0x6D2B79F5;
@@ -10,7 +13,12 @@ function mulberry32(a) {
     }
 }
 
-// Deterministically derive an independent sub-seed from a master seed + a label
+/* ============================================================
+   Sub-seed Generator
+   Study/Source: Knuth's Multiplicative Hash. 
+   Constant 2654435761 is the closest prime to 2^32 / phi 
+   (the golden ratio prime). Used for avalanche mixing of strings.
+   ============================================================ */
 function subSeed(masterSeed, salt) {
     let h = (masterSeed ^ 0) >>> 0;
     for (let i = 0; i < salt.length; i++) {
@@ -19,15 +27,27 @@ function subSeed(masterSeed, salt) {
     return h >>> 0;
 }
 
-function lerp(a, b, t) { return a + (b - a) * t; }
+/* ============================================================
+   Math Utilities
+   ============================================================ */
+function lerp(a, b, t) { 
+    return a + (b - a) * t; 
+}
 
 /* ============================================================
-    Noise utilities
-    ============================================================ */
+   GLSL Sine Hash
+   Study/Source: Classic GLSL pseudo-random generator (W.J.J. Rey, 1998). 
+   Multiplier 43758.5453 is a highly irrational scalar designed 
+   to severely alias the sine wave and break its periodicity.
+   ============================================================ */
 function hash11(n) {
     n = Math.sin(n) * 43758.5453;
     return n - Math.floor(n);
 }
+
+/* ============================================================
+   1D Value Noise
+   ============================================================ */
 function noise1D(x) {
     const i = Math.floor(x);
     const f = x - i;
@@ -38,14 +58,15 @@ function noise1D(x) {
 }
 
 /* ============================================================
-    GENOME
-    ============================================================ */
+   Genome Generation Functions
+   ============================================================ */
 function rollEyeCount(rng) {
     const r = rng();
     if (r < 0.95) return 2;
     if (r < 0.99) return 4;
     return 6 + Math.floor(rng() * 3);
 }
+
 function rollHornCount(rng) {
     const r = rng();
     if (r < 0.55) return 0;
@@ -53,6 +74,7 @@ function rollHornCount(rng) {
     if (r < 0.97) return 4;
     return 6;
 }
+
 function rollLimbPairs(rng) {
     const r = rng();
     if (r < 0.05) return 0;
@@ -92,8 +114,8 @@ function generateGenome(seed) {
 }
 
 /* ============================================================
-    SKELETON CONSTRUCTION
-    ============================================================ */
+   Skeleton Construction: Spine
+   ============================================================ */
 function buildSpine(genome, formRng, startX, startY) {
     const sizeScale = Math.pow(genome.mass / 5000, 0.28);
     const totalLen = (60 + genome.bodyLength * 90) * sizeScale;
@@ -124,6 +146,9 @@ function buildSpine(genome, formRng, startX, startY) {
     return nodes;
 }
 
+/* ============================================================
+   Skeleton Construction: Tail
+   ============================================================ */
 function buildTail(genome, formRng, lastNode) {
     if (genome.tailLength < 0.15) return [];
     const sizeScale = Math.pow(genome.mass / 5000, 0.28);
@@ -142,6 +167,9 @@ function buildTail(genome, formRng, lastNode) {
     return nodes;
 }
 
+/* ============================================================
+   Skeleton Construction: Head
+   ============================================================ */
 function buildHead(genome, formRng, spine) {
     const bodyTop = spine[0];
     const headR = bodyTop.r * (1 + genome.headSize * 1.2);
@@ -164,6 +192,9 @@ function buildHead(genome, formRng, spine) {
     return { bones, headCenter: { x: hx, y: hy }, headR };
 }
 
+/* ============================================================
+   Skeleton Construction: Limbs
+   ============================================================ */
 function buildLimbs(genome, formRng, spine) {
     const bones = [];
     if (genome.limbPairs === 0) return bones;
@@ -219,8 +250,8 @@ function buildLimbs(genome, formRng, spine) {
 }
 
 /* ============================================================
-    FABRIK IK SOLVER
-    ============================================================ */
+   Inverse Kinematics (FABRIK)
+   ============================================================ */
 function solveFABRIK(chain, targetX, targetY) {
     const n = chain.length;
     const lengths = [];
@@ -262,7 +293,9 @@ function solveFABRIK(chain, targetX, targetY) {
     }
 }
 
-
+/* ============================================================
+   Spatial Boundaries & Fitting
+   ============================================================ */
 function computeBounds(bones) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (let b of bones) {
@@ -280,17 +313,17 @@ function computeBounds(bones) {
     return { minX, minY, maxX, maxY };
 }
 
-function fitToCanvas(bones, head, canvasW, canvasH, padding) {
+function fitToBounds(bones, head, targetW, targetH, padding) {
     const bounds = computeBounds(bones);
     const w = bounds.maxX - bounds.minX;
     const h = bounds.maxY - bounds.minY;
-    const scale = Math.min((canvasW - padding * 2) / (w || 1), (canvasH - padding * 2) / (h || 1));
+    const scale = Math.min((targetW - padding * 2) / (w || 1), (targetH - padding * 2) / (h || 1));
     
     const cx = (bounds.minX + bounds.maxX) / 2;
     const cy = (bounds.minY + bounds.maxY) / 2;
     
-    const dx = canvasW / 2 - cx * scale;
-    const dy = canvasH / 2 - cy * scale;
+    const dx = targetW / 2 - cx * scale;
+    const dy = targetH / 2 - cy * scale;
     
     for (let b of bones) {
         b.ax = b.ax * scale + dx;
@@ -308,18 +341,19 @@ function fitToCanvas(bones, head, canvasW, canvasH, padding) {
     return scale;
 }
 
-
+/* ============================================================
+   Signed Distance Fields (SDF)
+   ============================================================ */
 function sdUnevenCapsule(px, py, ax, ay, bx, by, r1, r2) {
     const dx = bx - ax;
     const dy = by - ay;
     const L = Math.sqrt(dx * dx + dy * dy);
-
+    
     if (L === 0) {
         const dpx = px - ax, dpy = py - ay;
         return Math.sqrt(dpx * dpx + dpy * dpy) - Math.max(r1, r2);
     }
     
-
     if (L <= Math.abs(r1 - r2)) {
         if (r1 > r2) {
             const dpx = px - ax, dpy = py - ay;
@@ -330,30 +364,24 @@ function sdUnevenCapsule(px, py, ax, ay, bx, by, r1, r2) {
         }
     }
 
-    // Direction from A to B
     const dirX = dx / L;
     const dirY = dy / L;
     
-    // Point translated to origin A
     const tx = px - ax;
     const ty = py - ay;
     
-
     const y = tx * dirX + ty * dirY; 
     const x = Math.abs(tx * -dirY + ty * dirX); 
     
-    // Calculate the angle of the cone wall
     const sinT = (r1 - r2) / L;
     const cosT = Math.sqrt(Math.max(0.0, 1.0 - sinT * sinT));
     
     const proj = y * cosT - x * sinT;
     
     if (proj <= 0.0) {
-    
         return Math.sqrt(x * x + y * y) - r1;
     }
     if (proj >= L * cosT) {
-   
         const yL = y - L;
         return Math.sqrt(x * x + yL * yL) - r2;
     }
@@ -378,8 +406,8 @@ function evaluateField(px, py, bones, k) {
 }
 
 /* ============================================================
-    COLOR & CLASSIFICATION
-    ============================================================ */
+   Material & Color Generators
+   ============================================================ */
 function hslToRgb(h, s, l) {
     s /= 100; l /= 100;
     const k = n => (n + h / 30) % 12;
@@ -387,6 +415,7 @@ function hslToRgb(h, s, l) {
     const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
     return [255 * f(0), 255 * f(8), 255 * f(4)];
 }
+
 function computeSkinColor(genome) {
     const hue = genome.skinHue * 360;
     const sat = 40 + genome.skinBrightness * 20;
@@ -394,6 +423,9 @@ function computeSkinColor(genome) {
     return hslToRgb(hue, sat, light);
 }
 
+/* ============================================================
+   Creature Classification
+   ============================================================ */
 function classifyCreature(genome) {
     const facts = {};
     const legRatio = genome.legLength / genome.bodyLength;
@@ -422,23 +454,68 @@ function classifyCreature(genome) {
     return facts;
 }
 
-function drawEyes(ctx, genome, headCenter, headR) {
-    const n = genome.eyeCount;
-    for (let i = 0; i < n; i++) {
-        const t = n === 1 ? 0.5 : i / (n - 1);
-        const spread = headR * 1.1;
-        const ex = headCenter.x + (t - 0.5) * spread;
-        const ey = headCenter.y - headR * 0.15;
-        ctx.fillStyle = "rgba(10,10,10,0.9)";
-        ctx.beginPath();
-        ctx.arc(ex, ey, Math.max(1.5, headR * 0.09), 0, Math.PI * 2);
-        ctx.fill();
+/* ============================================================
+   Engine Entry Point
+   ============================================================ */
+function generateAlien(seed) {
+    const genome = generateGenome(seed);
+    const facts = classifyCreature(genome);
+    
+    const formRngSpine = mulberry32(subSeed(seed, "form-spine"));
+    const formRngTail = mulberry32(subSeed(seed, "form-tail"));
+    const formRngHead = mulberry32(subSeed(seed, "form-head"));
+    const formRngLimbs = mulberry32(subSeed(seed, "form-limbs"));
+
+    // Base origin point for geometry generation (can be translated later via fitToBounds)
+    const spine = buildSpine(genome, formRngSpine, 0, 0);
+    const tail = buildTail(genome, formRngTail, spine[spine.length - 1]);
+    const head = buildHead(genome, formRngHead, spine);
+    const limbBones = buildLimbs(genome, formRngLimbs, spine);
+
+    const spineBones = [];
+    for (let i = 0; i < spine.length - 1; i++) {
+        spineBones.push({ ax: spine[i].x, ay: spine[i].y, bx: spine[i + 1].x, by: spine[i + 1].y, r1: spine[i].r, r2: spine[i + 1].r });
     }
+    const tailBones = [];
+    let prev = spine[spine.length - 1];
+    for (const node of tail) {
+        tailBones.push({ ax: prev.x, ay: prev.y, bx: node.x, by: node.y, r1: prev.r, r2: node.r });
+        prev = node;
+    }
+
+    const allBones = [...spineBones, ...tailBones, ...head.bones, ...limbBones];
+    
+    const globalFormRng = mulberry32(subSeed(seed, "form-global"));
+    const baseThickness = allBones.length > 0 ? allBones[0].r1 : 10;
+    
+    return {
+        seed: seed,
+        genome: genome,
+        facts: facts,
+        geometry: {
+            spine: spineBones,
+            tail: tailBones,
+            limbs: limbBones,
+            head: head,
+            allBones: allBones
+        },
+        materials: {
+            baseColorRGB: computeSkinColor(genome),
+            smoothingK: baseThickness * (0.5 + globalFormRng() * 0.3)
+        }
+    };
 }
 
-/* ============================================================
-    RENDER PIPELINE
-    ============================================================ */
+// Export module logic for external environments if applicable
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { 
+        generateAlien, 
+        evaluateField, 
+        fitToBounds, 
+        computeBounds 
+    };
+}
+
 function renderAlien(canvasId, seed) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return null;
@@ -513,24 +590,3 @@ function renderAlien(canvasId, seed) {
 
     return { genome, facts, seed };
 }
-
-// Setup interaction
-function rollNew() {
-    document.getElementById('alienData').innerHTML = "Generating SDF... please wait.";
-    setTimeout(() => {
-        const seed = Math.floor(Math.random() * 4294967296);
-        const result = renderAlien("alienCanvas", seed);
-        
-        const facts = result.facts;
-        document.getElementById('alienData').innerHTML = `
-            <div style="margin-bottom:8px">Seed: <strong>${seed}</strong></div>
-            <span class="tag">${facts.size}</span>
-            <span class="tag">${facts.locomotion}</span>
-            <span class="tag">${facts.diet}</span>
-            <span class="tag">${facts.temperament}</span>
-        `;
-    }, 50);
-}
-
-window.onload = rollNew;
-document.getElementById('alienCanvas').addEventListener('click', rollNew);
