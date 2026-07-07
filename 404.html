@@ -4,24 +4,25 @@
     <meta charset="utf-8" />
     <title>Redirecting…</title>
     <script>
-      // GitHub Pages 404 fallback for SPA-style routing
-      // Sends user back to index with original path encoded in query/hash.
-      (function () {
-        var path = window.location.pathname;
-        var search = window.location.search || "";
-        var hash = window.location.hash || "";
+    (function () {
 
+        const params = new URLSearchParams(window.location.search);
 
-        var base = "/This-Alien-Does-Not-Exist";
-        var appPath = path.indexOf(base) === 0 ? path.slice(base.length) : path;
+        if (params.has("p")) {
+            window.location.replace("/index.html");
+            return;
+        }
 
-        var target =
-          base +
-          "/?p=" +
-          encodeURIComponent(appPath + search + hash);
+        const path = window.location.pathname;
+        const search = window.location.search;
+        const hash = window.location.hash;
 
-        window.location.replace(target);
-      })();
+        window.location.replace(
+            "/?p=" +
+            encodeURIComponent(path + search + hash)
+        );
+
+    })();
     </script>
   </head>
   <body></body>

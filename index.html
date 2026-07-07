@@ -169,9 +169,7 @@
 
   <script src="script.js"></script>
   <script>
-    const BASE_PATH = window.location.pathname
-    .replace(/\/+$/, "")
-    .replace(/\/[^/]*$/, "");
+    const BASE_PATH = "";
     const SEED_LENGTH = 12;
 
     function normalizeSeedString(seedLike) {
@@ -211,10 +209,15 @@
     }
 
     function updateURL(seed, push = false) {
-      const url = `${BASE_PATH}/${seed}`; // short URL ok
-      const state = { seed };
-      if (push) history.pushState(state, "", url);
-      else history.replaceState(state, "", url);
+
+        const url = "/" + displaySeed(seed);
+
+        const state = { seed };
+
+        if (push)
+            history.pushState(state, "", url);
+        else
+            history.replaceState(state, "", url);
     }
 
     function renderAlien(canvasId, seed) {
