@@ -151,7 +151,6 @@
   <main class="page">
     <section class="layout">
       <div class="canvas-wrap">
-
         <canvas id="alienCanvas" width="700" height="700" title="Click to generate random"></canvas>
       </div>
 
@@ -170,16 +169,8 @@
   <script src="script.js"></script>
   <script>
     const BASE_PATH = "";
-
-    // SEED_LENGTH and MAX_SEED are intentionally matched to the generator's
-    // actual entropy (mulberry32/subSeed operate on 32-bit state, so there
-    // are exactly 2^32 distinct creatures). Previously this was 12 digits
-    // (up to 10^12), which meant many different-looking IDs silently
-    // collided onto the same creature after ToInt32 wrapping -- undermining
-    // the "one ID = one permanent species" premise. Now every ID the UI can
-    // produce or accept maps to a genuinely distinct generator state.
     const SEED_LENGTH = 10;
-    const MAX_SEED = 4294967295; // 2^32 - 1
+    const MAX_SEED = 4294967295; 
 
     function normalizeSeedString(seedLike) {
       const s = String(seedLike ?? "").trim();
@@ -218,15 +209,119 @@
     }
 
     function updateURL(seed, push = false) {
-
         const url = "/" + displaySeed(seed);
-
         const state = { seed };
 
-        if (push)
-            history.pushState(state, "", url);
-        else
-            history.replaceState(state, "", url);
+        if (push) history.pushState(state, "", url);
+        else history.replaceState(state, "", url);
+    }
+    
+    function updateFavicon(canvas) {
+        let link = document.querySelector("link[rel~='icon']");
+        if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+        }
+        link.href = canvas.toDataURL("image/png");
+    }
+
+    /* ============================================================
+       Eye Rendering UI Layer - With Shading overlay logic
+       ============================================================ */
+    function drawEyes(ctx, eyeGenome, head, skinColorRGB, eyeColorRGB) {
+        if (eyeGenome.eyeCount === 0) return;
+        const positions = computeEyePositions(eyeGenome, head.headCenter, head.headR);
+        const [sR, sG, sB] = skinColorRGB;
+        const [eR, eG, eB] = eyeColorRGB;
+
+        for (const eye of positions) {
+            const { x, y, radius } = eye;
+
+            // Deep socket shadow
+            if (eyeGenome.socketDepth > 0.05) {
+                ctx.save();
+                ctx.globalAlpha = eyeGenome.socketDepth * 0.5;
+                ctx.fillStyle = "rgb(0,0,0)";
+                ctx.beginPath();
+                ctx.ellipse(x, y + radius * 0.15, radius * 1.35, radius * 1.25, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Sclera base
+            const irisR = eyeGenome.scleraVisible ? radius * eyeGenome.irisRadius : radius * 0.98;
+            if (eyeGenome.scleraVisible) {
+                ctx.fillStyle = `rgb(${Math.min(255, sR + 70)}, ${Math.min(255, sG + 65)}, ${Math.min(255, sB + 60)})`;
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Iris background & streaks
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, irisR, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.fillStyle = `rgb(${eR | 0}, ${eG | 0}, ${eB | 0})`;
+            ctx.fillRect(x - irisR, y - irisR, irisR * 2, irisR * 2);
+
+            const streakCount = Math.round(2 + eyeGenome.irisPattern * 10);
+            ctx.globalAlpha = 0.25 + eyeGenome.irisPattern * 0.35;
+            ctx.strokeStyle = `rgb(${Math.max(0, eR - 60)}, ${Math.max(0, eG - 60)}, ${Math.max(0, eB - 60)})`;
+            ctx.lineWidth = Math.max(0.6, irisR * 0.12);
+            for (let s = 0; s < streakCount; s++) {
+                const a = (s / streakCount) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + Math.cos(a) * irisR, y + Math.sin(a) * irisR);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // Pupil
+            const pupilR = irisR * eyeGenome.pupilRadius;
+            const squashX = 1 + (0.22 - 1) * eyeGenome.pupilShape;
+            ctx.fillStyle = "rgb(8,8,10)";
+            ctx.beginPath();
+            ctx.ellipse(x, y, pupilR * squashX, pupilR, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.clip();
+            const shadowGrad = ctx.createLinearGradient(x - radius, y - radius, x + radius, y + radius);
+            shadowGrad.addColorStop(0, "rgba(255,255,255,0.4)"); 
+            shadowGrad.addColorStop(0.4, "rgba(0,0,0,0)");
+            shadowGrad.addColorStop(1, "rgba(0,0,0,0.85)"); 
+            ctx.fillStyle = shadowGrad;
+            ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+            ctx.restore();
+
+            // Specular Highlight
+            ctx.save();
+            ctx.globalAlpha = eyeGenome.highlightStrength;
+            ctx.fillStyle = "rgb(255,255,255)";
+            ctx.beginPath();
+            ctx.arc(x - pupilR * 0.4, y - pupilR * 0.4, Math.max(0.8, pupilR * 0.3), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Eyelids
+            ctx.save();
+            ctx.fillStyle = `rgb(${sR | 0}, ${sG | 0}, ${sB | 0})`;
+            if (eyeGenome.eyelidTop > 0.02) {
+                const h = radius * 2 * eyeGenome.eyelidTop;
+                ctx.fillRect(x - radius * 1.05, y - radius * 1.05, radius * 2.1, h);
+            }
+            if (eyeGenome.eyelidBottom > 0.02) {
+                const h = radius * 2 * eyeGenome.eyelidBottom;
+                ctx.fillRect(x - radius * 1.05, y + radius * 1.05 - h, radius * 2.1, h);
+            }
+            ctx.restore();
+        }
     }
 
     function renderAlien(canvasId, seed) {
@@ -236,14 +331,20 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const numSeed = parseInt(seed, 10);
+      
+      // Pull pure geometry and material rules from the script
       const alien = generateAlien(numSeed);
 
       const allBones = alien.geometry.allBones;
       const head = alien.geometry.head;
       const [baseR, baseG, baseB] = alien.materials.baseColorRGB;
+      const eyeColorRGB = alien.materials.eyeColorRGB;
+      
+
       const scale = fitToBounds(allBones, head, canvas.width, canvas.height, 60);
       const k = alien.materials.smoothingK * scale;
 
+  
       const imgData = ctx.createImageData(canvas.width, canvas.height);
       const data = imgData.data;
       const eps = 1.0;
@@ -273,19 +374,20 @@
 
       ctx.putImageData(imgData, 0, 0);
 
-      // Full eye system: genome-driven socket/sclera/iris/pupil/eyelids,
-      // positioned from the already-scaled head. Replaces the old flat
-      // black-dot loop.
-      drawEyes(ctx, alien.eyes, head, [baseR, baseG, baseB]);
+      drawEyes(ctx, alien.eyes, head, [baseR, baseG, baseB], eyeColorRGB);
+      
+      updateFavicon(canvas);
 
       return alien;
     }
 
     function updateInfo(alien, seed) {
       document.getElementById("alienData").innerHTML = `
-        <span style="color:#fff">Seed:</span> ${displaySeed(seed)}<br>
-        <span style="color:#fff">Size:</span> ${alien.facts.size} &nbsp;|&nbsp;
+        <span style="color:#fff">Seed:</span> ${displaySeed(seed)}<br><br>
+        <span style="color:#fff">Plan:</span> ${alien.facts.bodyPlan} &nbsp;|&nbsp;
+        <span style="color:#fff">Size:</span> ${alien.facts.size}<br>
         <span style="color:#fff">Diet:</span> ${alien.facts.diet}<br>
+        <span style="color:#fff">Vision:</span> ${alien.facts.vision}<br>
         <span style="color:#fff">Locomotion:</span> ${alien.facts.locomotion} &nbsp;|&nbsp;
         <span style="color:#fff">Temperament:</span> ${alien.facts.temperament}
       `;
