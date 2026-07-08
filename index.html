@@ -223,10 +223,45 @@
         link.href = canvas.toDataURL("image/png");
     }
 
-    function getSkinPatternMod(noiseVal, patternType) {
-        if (patternType < 0.33) return noiseVal > 0.65 ? 1 : 0; // Spots
-        if (patternType < 0.66) return Math.sin(noiseVal * 30) > 0.5 ? 1 : 0; // Stripes
-        return noiseVal; // Mottled
+    function fbm2D(x, y, octaves) {
+        let amp = 0.5, freq = 1, sum = 0, norm = 0;
+        for (let i = 0; i < octaves; i++) {
+            sum += amp * noise2D(x * freq, y * freq);
+            norm += amp;
+            amp *= 0.5;
+            freq *= 2.15;
+        }
+        return sum / norm;
+    }
+
+    // Returns a 0..1 blend amount toward the accent color at (px, py).
+    // patternType picks the family; patternStyle (a second seed value)
+    // varies the look within that family so patterns don't repeat 1:1
+    // across creatures that share the same patternType bucket.
+    function computePatternMod(px, py, patScale, patternType, patternStyle) {
+        if (patternType < 0.25) { // Spots
+            const n = fbm2D(px * patScale, py * patScale, 3);
+            const thresh = 0.55 + patternStyle * 0.15;
+            return n > thresh ? Math.min(1, (n - thresh) * 5) : 0;
+        }
+        if (patternType < 0.5) { // Stripes
+            const warp = fbm2D(px * patScale * 0.4, py * patScale * 0.4, 2) * 6;
+            const s = Math.sin(px * patScale * (2 + patternStyle * 4) + warp);
+            return s > 0.25 ? Math.min(1, (s - 0.25) * 2) : 0;
+        }
+        if (patternType < 0.75) { // Scales
+            const freq = patScale * (2.2 + patternStyle * 1.5);
+            const row = Math.floor(py * freq);
+            const rowOffset = (row % 2) * 0.5;
+            const col = Math.floor(px * freq + rowOffset);
+            const cellV = hash21(col, row);
+            const fx = (px * freq + rowOffset) - col - 0.5;
+            const fy = (py * freq) - row - 0.5;
+            const edge = 1 - Math.min(1, Math.hypot(fx, fy) * 1.8);
+            return cellV > 0.4 ? Math.max(0, edge) : 0;
+        }
+        // Mottled
+        return fbm2D(px * patScale, py * patScale, 4);
     }
 
     /* ============================================================
@@ -342,6 +377,8 @@
       const head = alien.geometry.head;
       const eyePositions = alien.geometry.eyePositions;
       const [baseR, baseG, baseB] = alien.materials.baseColorRGB;
+      const [accR, accG, accB] = alien.materials.accentColorRGB;
+      const [hiR, hiG, hiB] = alien.materials.highlightColorRGB;
       const eyeColorRGB = alien.materials.eyeColorRGB;
       
       fitToBounds(allBones, head, eyePositions, canvas.width, canvas.height, 60);
@@ -351,11 +388,17 @@
       const eps = 1.0;
       
       const patType = alien.genome.skinPattern;
+      const patStyle = alien.genome.patternStyle;
+      const patContrast = alien.genome.patternContrast;
       const patScale = 0.05 * (1 + patType * 2);
+
+      // Key light
+      const lx = -0.5, ly = -0.5, lz = 0.8;
+      const flx = 0.65, fly = 0.45, flz = 0.35;
 
       for (let py = 0; py < canvas.height; py++) {
         for (let px = 0; px < canvas.width; px++) {
-          // evaluateField no longer needs a global 'k', each bone supplies its own dynamically
+
           const d = evaluateField(px, py, allBones);
           
           if (d < 1.0) {
@@ -368,22 +411,22 @@
             const nLen = Math.hypot(dx, dy, nz);
             const nx = dx / nLen, ny = dy / nLen, normZ = nz / nLen;
             
-            const lx = -0.5, ly = -0.5, lz = 0.8;
             const dot = Math.max(0, nx * lx + ny * ly + normZ * lz);
             const intensity = 0.25 + dot * 0.75;
 
-            // Skin Pattern 2D Volumetric lookup
-            const noiseVal = noise2D(px * patScale, py * patScale);
-            const patternMod = getSkinPatternMod(noiseVal, patType);
-            
-            // Darken base color where pattern is active
-            const pR = baseR * (1 - patternMod * 0.5);
-            const pG = baseG * (1 - patternMod * 0.5);
-            const pB = baseB * (1 - patternMod * 0.5);
+            const fillDot = Math.max(0, nx * flx + ny * fly + normZ * flz);
+            const fill = fillDot * 0.16;
 
-            data[idx] = Math.min(255, pR * intensity);
-            data[idx + 1] = Math.min(255, pG * intensity);
-            data[idx + 2] = Math.min(255, pB * intensity);
+            // Skin pattern
+            const patternMod = computePatternMod(px, py, patScale, patType, patStyle) * patContrast;
+
+            const pR = baseR * (1 - patternMod) + accR * patternMod;
+            const pG = baseG * (1 - patternMod) + accG * patternMod;
+            const pB = baseB * (1 - patternMod) + accB * patternMod;
+
+            data[idx] = Math.min(255, pR * intensity + hiR * fill);
+            data[idx + 1] = Math.min(255, pG * intensity + hiG * fill);
+            data[idx + 2] = Math.min(255, pB * intensity + hiB * fill);
             data[idx + 3] = alpha * 255;
           }
         }
@@ -439,7 +482,6 @@
       if (seedFromUrl) {
       newAlien("url", seedFromUrl);
 
-      // Remove ?p=... and leave the clean URL
       history.replaceState(
           { seed: seedFromUrl },
           "",

@@ -73,6 +73,7 @@ function generateGenome(seed) {
     const limbRng = mulberry32(subSeed(seed, "traits-limbs"));
     const headRng = mulberry32(subSeed(seed, "traits-head"));
     const skinRng = mulberry32(subSeed(seed, "traits-skin"));
+    const v2Rng = mulberry32(subSeed(seed, "traits-v2"));
 
     const skew = (rng, p) => Math.pow(rng(), p);
 
@@ -142,6 +143,22 @@ function generateGenome(seed) {
         skinHue: skinRng(),
         skinBrightness: skinRng(),
         skinPattern: skinRng(),
+
+        paletteScheme: weightedChoice(v2Rng, [[0.3, "complementary"], [0.3, "analogous"], [0.25, "triadic"], [0.15, "monochrome"]]),
+        accentHueOffset: v2Rng(),
+        patternContrast: lerp(0.25, 0.85, v2Rng()),
+        patternStyle: v2Rng(),
+
+        asymmetry: Math.pow(v2Rng(), 2.5),
+        asymmetryBias: v2Rng() < 0.5 ? -1 : 1,
+
+        dorsalSpikeCount: weightedChoice(v2Rng, [[0.45, 0], [0.35, Math.floor(lerp(3, 6, v2Rng()))], [0.2, Math.floor(lerp(7, 13, v2Rng()))]]),
+        spikeScale: lerp(0.5, 1.6, v2Rng()),
+
+        abdomenSegments: Math.floor(lerp(2, 5, v2Rng())),
+
+        wingSpan: lerp(0.6, 1.8, v2Rng()),
+        tentacleCurl: lerp(0.3, 1.0, v2Rng()),
     };
 }
 
@@ -250,7 +267,8 @@ function buildHead(genome, formRng, spine) {
     for (let i = 0; i < genome.hornCount; i++) {
         const side = i % 2 === 0 ? -1 : 1;
         const angle = -Math.PI / 2 + side * (0.3 + formRng() * 0.4);
-        const len = craniumR * (0.8 + formRng() * 0.8);
+        const asym = 1 + side * genome.asymmetryBias * genome.asymmetry * 0.5;
+        const len = craniumR * (0.8 + formRng() * 0.8) * asym;
         const bx = hx + Math.cos(angle) * len;
         const by = craniumTopY + Math.sin(angle) * len;
         bones.push({ ax: hx, ay: craniumTopY, bx, by, r1: craniumR * 0.2, r2: craniumR * 0.02, k: craniumR * 0.1 });
@@ -263,6 +281,91 @@ function buildHead(genome, formRng, spine) {
         headCenter: { x: hx + Math.sin(tilt) * snoutL * 0.25, y: focusY }, 
         headR: craniumR * 1.1 
     };
+}
+
+/* ============================================================
+   Dorsal Spikes / Frills (silhouette diversity)
+   ============================================================ */
+function buildSpikes(genome, formRng, spine) {
+    const bones = [];
+    const count = genome.dorsalSpikeCount;
+    if (!count || spine.length < 2) return bones;
+
+    for (let i = 0; i < count; i++) {
+        const t = 0.12 + (i / Math.max(1, count - 1)) * 0.7;
+        const idx = Math.min(spine.length - 1, Math.round(t * (spine.length - 1)));
+        const node = spine[idx];
+        const next = spine[Math.min(spine.length - 1, idx + 1)];
+        const dx = next.x - node.x, dy = next.y - node.y;
+        const len = Math.hypot(dx, dy) || 1;
+        let nx = -dy / len, ny = dx / len;
+        if (ny > 0) { nx = -nx; ny = -ny; } // keep spikes on the dorsal (upper) side
+
+        const spikeLen = node.r * (0.7 + formRng() * 0.9) * genome.spikeScale;
+        const backLean = 0.25 + formRng() * 0.25; // lean toward tail
+        const bx = node.x + nx * spikeLen;
+        const by = node.y + ny * spikeLen + dy * backLean;
+
+        bones.push({ ax: node.x, ay: node.y, bx, by, r1: node.r * 0.22, r2: 1, k: node.r * 0.12 });
+    }
+    return bones;
+}
+
+/* ============================================================
+   Wings (Winged body plan)
+   ============================================================ */
+function buildWings(genome, formRng, spine) {
+    const bones = [];
+    if (genome.bodyPlan !== "Winged" || spine.length < 2) return bones;
+
+    const sizeScale = Math.pow(genome.mass / 5000, 0.28);
+    const idx = Math.max(0, Math.floor(spine.length * 0.28));
+    const attach = spine[idx];
+    const span = (40 + genome.wingSpan * 90) * sizeScale;
+    const rootR = attach.r * 0.9;
+
+    [-1, 1].forEach(side => {
+        const asym = 1 + side * genome.asymmetryBias * genome.asymmetry * 0.35;
+        const sweep = -0.35 + (formRng() - 0.5) * 0.2;
+
+        // Leading edge
+        const tipX = attach.x + side * Math.cos(sweep) * span * asym;
+        const tipY = attach.y - Math.sin(sweep + 0.35) * span * 0.55 * asym;
+        bones.push({ ax: attach.x, ay: attach.y, bx: tipX, by: tipY, r1: rootR, r2: Math.max(1, rootR * 0.12), k: rootR * 0.55 });
+
+        // Trailing edge
+        const tip2X = attach.x + side * Math.cos(sweep) * span * 0.55 * asym;
+        const tip2Y = attach.y + span * 0.3 * asym;
+        bones.push({ ax: attach.x, ay: attach.y, bx: tip2X, by: tip2Y, r1: rootR * 0.7, r2: Math.max(1, rootR * 0.1), k: rootR * 0.4 });
+    });
+    return bones;
+}
+
+/* ============================================================
+   Segmented Abdomen (Insectoid / Arachnoid)
+   ============================================================ */
+function buildSegments(genome, formRng, spine) {
+    const bones = [];
+    if (!(genome.bodyPlan === "Insectoid" || genome.bodyPlan === "Arachnoid") || spine.length < 2) return bones;
+
+    const segCount = genome.abdomenSegments;
+    for (let i = 0; i < segCount; i++) {
+        const t = 0.55 + (i / Math.max(1, segCount - 1)) * 0.4;
+        const idx = Math.min(spine.length - 1, Math.round(t * (spine.length - 1)));
+        const node = spine[idx];
+        const next = spine[Math.min(spine.length - 1, idx + 1)];
+        const dx = next.x - node.x, dy = next.y - node.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len, ny = dx / len;
+        const bulge = node.r * (0.25 + formRng() * 0.3);
+
+        bones.push({
+            ax: node.x - nx * bulge, ay: node.y - ny * bulge,
+            bx: node.x + nx * bulge, by: node.y + ny * bulge,
+            r1: node.r * 0.55, r2: node.r * 0.55, k: node.r * 0.3
+        });
+    }
+    return bones;
 }
 
 /* ============================================================
@@ -369,7 +472,8 @@ function buildLimbs(genome, formRng, spine) {
 
         [-1, 1].forEach(side => {
             let legLenPx = (20 + genome.legLength * 55) * Math.pow(genome.mass / 5000, 0.3);
-            
+            legLenPx *= 1 + side * genome.asymmetryBias * genome.asymmetry * 0.3;
+
             if (genome.bodyPlan === "Biped" && p === 0) legLenPx *= 0.4; 
             if (genome.bodyPlan === "Winged" && p === 0) legLenPx *= 1.8; 
 
@@ -401,6 +505,15 @@ function buildLimbs(genome, formRng, spine) {
             const targetY = attach.y + dirY * legLenPx + heightJitter;
 
             solveFABRIK(chain, targetX, targetY);
+
+            if (genome.bodyPlan === "Cephalopod") {
+                const curlAmt = genome.tentacleCurl * segLen * 0.9;
+                const curlPhase = formRng() * Math.PI * 2;
+                for (let i = 1; i < chain.length - 1; i++) {
+                    const tt = i / (chain.length - 1);
+                    chain[i].x += Math.sin(tt * Math.PI * 2.4 + curlPhase) * curlAmt * tt * side;
+                }
+            }
 
             // True Allometric Scaling
             const baseDiam = (4 + genome.bodyWidth * 7) * Math.pow(genome.mass / 5000, 0.41) * (0.5 + formRng() * 0.3);
@@ -578,6 +691,33 @@ function computeSkinColor(genome) {
 }
 
 /* ============================================================
+   V2: Harmonious Palette Generator
+   Base hue comes from genome.skinHue (unchanged). An accent hue is
+   derived from a color-theory scheme so pattern/eye colors always
+   relate to the base instead of being an arbitrary darken.
+   ============================================================ */
+function computePalette(genome) {
+    const baseHue = genome.skinHue * 360;
+    const scheme = genome.paletteScheme;
+
+    let accentHue;
+    if (scheme === "complementary") accentHue = baseHue + 180;
+    else if (scheme === "analogous") accentHue = baseHue + (genome.accentHueOffset > 0.5 ? 32 : -32);
+    else if (scheme === "triadic") accentHue = baseHue + (genome.accentHueOffset > 0.5 ? 120 : -120);
+    else accentHue = baseHue + (genome.accentHueOffset - 0.5) * 24; // monochrome
+
+    const sat = 38 + genome.skinBrightness * 32;
+    const light = 28 + genome.skinBrightness * 34;
+
+    const base = hslToRgb(baseHue, sat, light);
+    const accent = hslToRgb(accentHue, Math.min(88, sat + 18), Math.max(18, light - 12));
+    const highlight = hslToRgb(baseHue, Math.max(20, sat - 18), Math.min(88, light + 30));
+    const eye = hslToRgb(accentHue + 15, 55 + genome.accentHueOffset * 22, 42 + genome.accentHueOffset * 16);
+
+    return { base, accent, highlight, eye };
+}
+
+/* ============================================================
    Derived Biological Classification
    ============================================================ */
 function classifyCreature(genome) {
@@ -632,11 +772,17 @@ function generateAlien(seed) {
     const formRngTail = mulberry32(subSeed(seed, "form-tail"));
     const formRngHead = mulberry32(subSeed(seed, "form-head"));
     const formRngLimbs = mulberry32(subSeed(seed, "form-limbs"));
+    const formRngSpikes = mulberry32(subSeed(seed, "form-spikes"));
+    const formRngWings = mulberry32(subSeed(seed, "form-wings"));
+    const formRngSegments = mulberry32(subSeed(seed, "form-segments"));
 
     const spine = buildSpine(genome, formRngSpine, 0, 0);
     const tail = buildTail(genome, formRngTail, spine[spine.length - 1]);
     const head = buildHead(genome, formRngHead, spine);
     const limbBones = buildLimbs(genome, formRngLimbs, spine);
+    const spikeBones = buildSpikes(genome, formRngSpikes, spine);
+    const wingBones = buildWings(genome, formRngWings, spine);
+    const segmentBones = buildSegments(genome, formRngSegments, spine);
 
     const spineBones = [];
     for (let i = 0; i < spine.length - 1; i++) {
@@ -650,11 +796,13 @@ function generateAlien(seed) {
         prev = node;
     }
 
-    const allBones = [...spineBones, ...tailBones, ...head.bones, ...limbBones];
+    const allBones = [...spineBones, ...tailBones, ...head.bones, ...limbBones, ...spikeBones, ...wingBones, ...segmentBones];
     
     // Snapped Eye Geometry calculated against the full SDF
     const eyeGenome = generateEyeGenome(seed, genome);
     const eyePositions = computeEyePositions(eyeGenome, head.headCenter, head.headR, allBones);
+
+    const palette = computePalette(genome);
 
     return {
         seed: seed,
@@ -670,12 +818,14 @@ function generateAlien(seed) {
             allBones: allBones
         },
         materials: {
-            baseColorRGB: computeSkinColor(genome),
-            eyeColorRGB: hslToRgb(eyeGenome.eyeColor * 360, 60, 45)
+            baseColorRGB: palette.base,
+            accentColorRGB: palette.accent,
+            highlightColorRGB: palette.highlight,
+            eyeColorRGB: palette.eye
         }
     };
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { generateAlien, evaluateField, fitToBounds, noise2D };
+    module.exports = { generateAlien, evaluateField, fitToBounds, noise2D, computePalette };
 }
