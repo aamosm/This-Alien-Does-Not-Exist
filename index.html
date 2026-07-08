@@ -195,17 +195,15 @@
     }
 
     function getSeedFromRedirectParam() {
-    const params = new URLSearchParams(window.location.search);
-
-    const p = params.get("p");
-    if (!p) return null;
-
-    try {
-        return extractSeedFromPath(decodeURIComponent(p));
-    } catch {
-        return null;
+      const params = new URLSearchParams(window.location.search);
+      const p = params.get("p");
+      if (!p) return null;
+      try {
+          return extractSeedFromPath(decodeURIComponent(p));
+      } catch {
+          return null;
+      }
     }
-}
 
     function updateURL(seed, push = false) {
         const url = "/" + displaySeed(seed);
@@ -234,39 +232,31 @@
         return sum / norm;
     }
 
-    // Returns a 0..1 blend amount toward the accent color at (px, py).
-    // patternType picks the family; patternStyle (a second seed value)
-    // varies the look within that family so patterns don't repeat 1:1
-    // across creatures that share the same patternType bucket.
     function computePatternMod(px, py, patScale, patternType, patternStyle) {
-        if (patternType < 0.25) { // Spots
+        if (patternType < 0.25) { 
             const n = fbm2D(px * patScale, py * patScale, 3);
             const thresh = 0.55 + patternStyle * 0.15;
             return n > thresh ? Math.min(1, (n - thresh) * 5) : 0;
         }
-        if (patternType < 0.5) { // Stripes
+        if (patternType < 0.5) { 
             const warp = fbm2D(px * patScale * 0.4, py * patScale * 0.4, 2) * 6;
             const s = Math.sin(px * patScale * (2 + patternStyle * 4) + warp);
             return s > 0.25 ? Math.min(1, (s - 0.25) * 2) : 0;
         }
-        if (patternType < 0.75) { // Scales
+        if (patternType < 0.75) { 
             const freq = patScale * (2.2 + patternStyle * 1.5);
             const row = Math.floor(py * freq);
             const rowOffset = (row % 2) * 0.5;
             const col = Math.floor(px * freq + rowOffset);
-            const cellV = hash21(col, row);
+            const cellV = hash21(col, row); 
             const fx = (px * freq + rowOffset) - col - 0.5;
             const fy = (py * freq) - row - 0.5;
             const edge = 1 - Math.min(1, Math.hypot(fx, fy) * 1.8);
             return cellV > 0.4 ? Math.max(0, edge) : 0;
         }
-        // Mottled
         return fbm2D(px * patScale, py * patScale, 4);
     }
 
-    /* ============================================================
-       True Embedded Eyelid Drawing using Bezier Sockets
-       ============================================================ */
     function drawEyes(ctx, eyeGenome, positions, skinColorRGB, eyeColorRGB) {
         if (eyeGenome.eyeCount === 0 || !positions) return;
         const [sR, sG, sB] = skinColorRGB;
@@ -275,7 +265,6 @@
         for (const eye of positions) {
             const { x, y, radius } = eye;
 
-            // Base Socket Shadow
             if (eyeGenome.socketDepth > 0.05) {
                 ctx.save();
                 ctx.globalAlpha = eyeGenome.socketDepth * 0.7;
@@ -286,7 +275,6 @@
                 ctx.restore();
             }
 
-            // Draw eye inside a biological clipping mask (socket/eyelids)
             ctx.save();
             ctx.beginPath();
             const topCtrlY = y - radius * (2 - eyeGenome.eyelidTop * 4);
@@ -296,7 +284,6 @@
             ctx.quadraticCurveTo(x, botCtrlY, x - radius, y);
             ctx.clip();
 
-            // Sclera
             const irisR = eyeGenome.scleraVisible ? radius * eyeGenome.irisRadius : radius * 0.98;
             ctx.fillStyle = eyeGenome.scleraVisible 
                 ? `rgb(${Math.min(255, sR + 70)}, ${Math.min(255, sG + 65)}, ${Math.min(255, sB + 60)})`
@@ -325,7 +312,6 @@
                 ctx.restore();
             }
 
-            // Ecological Pupils
             const pupilR = irisR * eyeGenome.pupilRadius;
             ctx.fillStyle = "rgb(8,8,10)";
             ctx.beginPath();
@@ -338,7 +324,6 @@
             }
             ctx.fill();
 
-            // SDF Ambient Occlusion Shadow matching global light direction
             const shadowGrad = ctx.createLinearGradient(x - radius, y - radius, x + radius, y + radius);
             shadowGrad.addColorStop(0, "rgba(255,255,255,0.4)"); 
             shadowGrad.addColorStop(0.4, "rgba(0,0,0,0)");
@@ -346,7 +331,6 @@
             ctx.fillStyle = shadowGrad;
             ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
 
-            // Specular Highlight
             ctx.globalAlpha = eyeGenome.highlightStrength;
             ctx.fillStyle = "rgb(255,255,255)";
             ctx.beginPath();
@@ -373,6 +357,8 @@
       const numSeed = parseInt(seed, 10);
       const alien = generateAlien(numSeed);
 
+      fitToBounds(alien, canvas.width, canvas.height, 60);
+
       const allBones = alien.geometry.allBones;
       const head = alien.geometry.head;
       const eyePositions = alien.geometry.eyePositions;
@@ -381,8 +367,6 @@
       const [hiR, hiG, hiB] = alien.materials.highlightColorRGB;
       const eyeColorRGB = alien.materials.eyeColorRGB;
       
-      fitToBounds(allBones, head, eyePositions, canvas.width, canvas.height, 60);
-
       const imgData = ctx.createImageData(canvas.width, canvas.height);
       const data = imgData.data;
       const eps = 1.0;
@@ -390,9 +374,8 @@
       const patType = alien.genome.skinPattern;
       const patStyle = alien.genome.patternStyle;
       const patContrast = alien.genome.patternContrast;
-      const patScale = 0.05 * (1 + patType * 2);
+      const patScale = alien.materials.patternScaleMultiplier * (1 + patType * 2);
 
-      // Key light
       const lx = -0.5, ly = -0.5, lz = 0.8;
       const flx = 0.65, fly = 0.45, flz = 0.35;
 
@@ -412,12 +395,17 @@
             const nx = dx / nLen, ny = dy / nLen, normZ = nz / nLen;
             
             const dot = Math.max(0, nx * lx + ny * ly + normZ * lz);
-            const intensity = 0.25 + dot * 0.75;
+            let intensity = 0.25 + dot * 0.75;
 
             const fillDot = Math.max(0, nx * flx + ny * fly + normZ * flz);
             const fill = fillDot * 0.16;
 
-            // Skin pattern
+            if(head.headCenter && head.headR) {
+              const distToHead = Math.hypot(px - head.headCenter.x, py - head.headCenter.y);
+              const headGlow = Math.max(0, 1.0 - distToHead / (head.headR * 3.5)) * 0.15;
+              intensity += headGlow;
+            }
+
             const patternMod = computePatternMod(px, py, patScale, patType, patStyle) * patContrast;
 
             const pR = baseR * (1 - patternMod) + accR * patternMod;
@@ -433,7 +421,6 @@
       }
 
       ctx.putImageData(imgData, 0, 0);
-
       drawEyes(ctx, alien.eyes, eyePositions, [baseR, baseG, baseB], eyeColorRGB);
       updateFavicon(canvas);
 
@@ -445,10 +432,14 @@
         <span style="color:#fff">Seed:</span> ${displaySeed(seed)}<br><br>
         <span style="color:#fff">Plan:</span> ${alien.facts.bodyPlan} &nbsp;|&nbsp;
         <span style="color:#fff">Size:</span> ${alien.facts.size}<br>
-        <span style="color:#fff">Diet:</span> ${alien.facts.diet}<br>
+        <span style="color:#fff">Mass:</span> ${Math.round(alien.genome.mass).toLocaleString()} kg<br>
+        <span style="color:#fff">Diet:</span> ${alien.facts.diet} &nbsp;|&nbsp;
+        <span style="color:#fff">Mouth:</span> ${alien.genome.mouthType}<br>
         <span style="color:#fff">Vision:</span> ${alien.facts.vision}<br>
         <span style="color:#fff">Locomotion:</span> ${alien.facts.locomotion} &nbsp;|&nbsp;
-        <span style="color:#fff">Temperament:</span> ${alien.facts.temperament}
+        <span style="color:#fff">Tail:</span> ${alien.genome.tailLength > 0.15 ? alien.genome.tailType : "None"}<br>
+        <span style="color:#fff">Temperament:</span> ${alien.facts.temperament}<br>
+        <span style="color:#fff">Pigment:</span> ${alien.genome.paletteScheme}
       `;
     }
 
@@ -481,15 +472,10 @@
 
       if (seedFromUrl) {
       newAlien("url", seedFromUrl);
-
-      history.replaceState(
-          { seed: seedFromUrl },
-          "",
-          "/" + displaySeed(seedFromUrl)
-      );
-} else {
-    newAlien("random");
-}
+      history.replaceState({ seed: seedFromUrl }, "", "/" + displaySeed(seedFromUrl));
+      } else {
+        newAlien("random");
+      }
     });
 
     window.addEventListener("popstate", (event) => {
@@ -503,12 +489,7 @@
 
       if (seedFromUrl) {
           newAlien("url", seedFromUrl);
-
-          history.replaceState(
-              { seed: seedFromUrl },
-              "",
-              "/" + displaySeed(seedFromUrl)
-          );
+          history.replaceState({ seed: seedFromUrl }, "", "/" + displaySeed(seedFromUrl));
       } else {
           newAlien("random");
       }
