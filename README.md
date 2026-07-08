@@ -5,6 +5,7 @@
 A procedural alien generator with <abbr title="4,294,967,296 unique deterministic aliens (2³²)">Infinite</abbr> unique aliens.
 
 **Live:** https://thisaliendoesnotexist.app/
+**devlog:** https://stardance.hackclub.com/projects/29187
 
 </div>
 
