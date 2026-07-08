@@ -194,6 +194,19 @@
       return normalizeSeedString(p.split("/")[0]);
     }
 
+    function getSeedFromRedirectParam() {
+    const params = new URLSearchParams(window.location.search);
+
+    const p = params.get("p");
+    if (!p) return null;
+
+    try {
+        return extractSeedFromPath(decodeURIComponent(p));
+    } catch {
+        return null;
+    }
+}
+
     function updateURL(seed, push = false) {
         const url = "/" + displaySeed(seed);
         if (push) history.pushState({ seed }, "", url);
@@ -423,8 +436,18 @@
         extractSeedFromPath(window.location.pathname) ||
         getSeedFromRedirectParam();
 
-      if (seedFromUrl) newAlien("url", seedFromUrl);
-      else newAlien("random");
+      if (seedFromUrl) {
+      newAlien("url", seedFromUrl);
+
+      // Remove ?p=... and leave the clean URL
+      history.replaceState(
+          { seed: seedFromUrl },
+          "",
+          "/" + displaySeed(seedFromUrl)
+      );
+} else {
+    newAlien("random");
+}
     });
 
     window.addEventListener("popstate", (event) => {
@@ -436,8 +459,17 @@
         extractSeedFromPath(window.location.pathname) ||
         getSeedFromRedirectParam();
 
-      if (seedFromUrl) newAlien("url", seedFromUrl);
-      else newAlien("random");
+      if (seedFromUrl) {
+          newAlien("url", seedFromUrl);
+
+          history.replaceState(
+              { seed: seedFromUrl },
+              "",
+              "/" + displaySeed(seedFromUrl)
+          );
+      } else {
+          newAlien("random");
+      }
     });
 
     document.getElementById("generateBtn").addEventListener("click", () => newAlien("input"));

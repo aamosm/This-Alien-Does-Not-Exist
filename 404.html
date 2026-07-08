@@ -1,29 +1,32 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Redirecting…</title>
-    <script>
-    (function () {
+<head>
+<meta charset="utf-8">
+<title>Redirecting...</title>
 
-        const params = new URLSearchParams(window.location.search);
+<script>
+(function () {
 
-        if (params.has("p")) {
-            window.location.replace("/index.html");
-            return;
-        }
+    const params = new URLSearchParams(location.search);
 
-        const path = window.location.pathname;
-        const search = window.location.search;
-        const hash = window.location.hash;
 
-        window.location.replace(
-            "/?p=" +
-            encodeURIComponent(path + search + hash)
-        );
+    if (params.has("p")) {
+        location.replace("/" + location.search);
+        return;
+    }
 
-    })();
-    </script>
-  </head>
-  <body></body>
+    location.replace(
+        "/?p=" +
+        encodeURIComponent(
+            location.pathname +
+            location.search +
+            location.hash
+        )
+    );
+
+})();
+</script>
+
+</head>
+<body></body>
 </html>
