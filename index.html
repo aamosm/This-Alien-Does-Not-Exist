@@ -135,12 +135,10 @@
         grid-template-columns: 1fr;
         gap: 16px;
       }
-
       canvas {
         width: min(100%, 82vw);
         max-width: 620px;
       }
-
       .panel {
         min-height: auto;
       }
@@ -196,24 +194,10 @@
       return normalizeSeedString(p.split("/")[0]);
     }
 
-    function getSeedFromRedirectParam() {
-      const params = new URLSearchParams(window.location.search);
-      const p = params.get("p");
-      if (!p) return null;
-      try {
-        const decoded = decodeURIComponent(p);
-        return extractSeedFromPath(decoded);
-      } catch {
-        return null;
-      }
-    }
-
     function updateURL(seed, push = false) {
         const url = "/" + displaySeed(seed);
-        const state = { seed };
-
-        if (push) history.pushState(state, "", url);
-        else history.replaceState(state, "", url);
+        if (push) history.pushState({ seed }, "", url);
+        else history.replaceState({ seed }, "", url);
     }
     
     function updateFavicon(canvas) {
@@ -226,22 +210,27 @@
         link.href = canvas.toDataURL("image/png");
     }
 
+    function getSkinPatternMod(noiseVal, patternType) {
+        if (patternType < 0.33) return noiseVal > 0.65 ? 1 : 0; // Spots
+        if (patternType < 0.66) return Math.sin(noiseVal * 30) > 0.5 ? 1 : 0; // Stripes
+        return noiseVal; // Mottled
+    }
+
     /* ============================================================
-       Eye Rendering UI Layer - With Shading overlay logic
+       True Embedded Eyelid Drawing using Bezier Sockets
        ============================================================ */
-    function drawEyes(ctx, eyeGenome, head, skinColorRGB, eyeColorRGB) {
-        if (eyeGenome.eyeCount === 0) return;
-        const positions = computeEyePositions(eyeGenome, head.headCenter, head.headR);
+    function drawEyes(ctx, eyeGenome, positions, skinColorRGB, eyeColorRGB) {
+        if (eyeGenome.eyeCount === 0 || !positions) return;
         const [sR, sG, sB] = skinColorRGB;
         const [eR, eG, eB] = eyeColorRGB;
 
         for (const eye of positions) {
             const { x, y, radius } = eye;
 
-            // Deep socket shadow
+            // Base Socket Shadow
             if (eyeGenome.socketDepth > 0.05) {
                 ctx.save();
-                ctx.globalAlpha = eyeGenome.socketDepth * 0.5;
+                ctx.globalAlpha = eyeGenome.socketDepth * 0.7;
                 ctx.fillStyle = "rgb(0,0,0)";
                 ctx.beginPath();
                 ctx.ellipse(x, y + radius * 0.15, radius * 1.35, radius * 1.25, 0, 0, Math.PI * 2);
@@ -249,78 +238,81 @@
                 ctx.restore();
             }
 
-            // Sclera base
-            const irisR = eyeGenome.scleraVisible ? radius * eyeGenome.irisRadius : radius * 0.98;
-            if (eyeGenome.scleraVisible) {
-                ctx.fillStyle = `rgb(${Math.min(255, sR + 70)}, ${Math.min(255, sG + 65)}, ${Math.min(255, sB + 60)})`;
-                ctx.beginPath();
-                ctx.arc(x, y, radius, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            // Iris background & streaks
+            // Draw eye inside a biological clipping mask (socket/eyelids)
             ctx.save();
             ctx.beginPath();
-            ctx.arc(x, y, irisR, 0, Math.PI * 2);
+            const topCtrlY = y - radius * (2 - eyeGenome.eyelidTop * 4);
+            const botCtrlY = y + radius * (2 - eyeGenome.eyelidBottom * 4);
+            ctx.moveTo(x - radius, y);
+            ctx.quadraticCurveTo(x, topCtrlY, x + radius, y);
+            ctx.quadraticCurveTo(x, botCtrlY, x - radius, y);
             ctx.clip();
-            ctx.fillStyle = `rgb(${eR | 0}, ${eG | 0}, ${eB | 0})`;
-            ctx.fillRect(x - irisR, y - irisR, irisR * 2, irisR * 2);
 
-            const streakCount = Math.round(2 + eyeGenome.irisPattern * 10);
-            ctx.globalAlpha = 0.25 + eyeGenome.irisPattern * 0.35;
-            ctx.strokeStyle = `rgb(${Math.max(0, eR - 60)}, ${Math.max(0, eG - 60)}, ${Math.max(0, eB - 60)})`;
-            ctx.lineWidth = Math.max(0.6, irisR * 0.12);
-            for (let s = 0; s < streakCount; s++) {
-                const a = (s / streakCount) * Math.PI * 2;
+            // Sclera
+            const irisR = eyeGenome.scleraVisible ? radius * eyeGenome.irisRadius : radius * 0.98;
+            ctx.fillStyle = eyeGenome.scleraVisible 
+                ? `rgb(${Math.min(255, sR + 70)}, ${Math.min(255, sG + 65)}, ${Math.min(255, sB + 60)})`
+                : `rgb(${eR | 0}, ${eG | 0}, ${eB | 0})`;
+            ctx.fillRect(x - radius, y - radius, radius*2, radius*2);
+
+            if (eyeGenome.scleraVisible) {
+                ctx.save();
                 ctx.beginPath();
-                ctx.moveTo(x, y);
-                ctx.lineTo(x + Math.cos(a) * irisR, y + Math.sin(a) * irisR);
-                ctx.stroke();
-            }
-            ctx.restore();
+                ctx.arc(x, y, irisR, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.fillStyle = `rgb(${eR | 0}, ${eG | 0}, ${eB | 0})`;
+                ctx.fillRect(x - irisR, y - irisR, irisR * 2, irisR * 2);
 
-            // Pupil
+                const streakCount = Math.round(2 + eyeGenome.irisPattern * 10);
+                ctx.globalAlpha = 0.25 + eyeGenome.irisPattern * 0.35;
+                ctx.strokeStyle = `rgb(${Math.max(0, eR - 60)}, ${Math.max(0, eG - 60)}, ${Math.max(0, eB - 60)})`;
+                ctx.lineWidth = Math.max(0.6, irisR * 0.12);
+                for (let s = 0; s < streakCount; s++) {
+                    const a = (s / streakCount) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + Math.cos(a) * irisR, y + Math.sin(a) * irisR);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // Ecological Pupils
             const pupilR = irisR * eyeGenome.pupilRadius;
-            const squashX = 1 + (0.22 - 1) * eyeGenome.pupilShape;
             ctx.fillStyle = "rgb(8,8,10)";
             ctx.beginPath();
-            ctx.ellipse(x, y, pupilR * squashX, pupilR, 0, 0, Math.PI * 2);
+            if (eyeGenome.pupilType === "slit") {
+                ctx.ellipse(x, y, pupilR * 0.2, pupilR, 0, 0, Math.PI * 2);
+            } else if (eyeGenome.pupilType === "horizontal") {
+                ctx.ellipse(x, y, pupilR, pupilR * 0.3, 0, 0, Math.PI * 2);
+            } else {
+                ctx.arc(x, y, pupilR, 0, Math.PI * 2);
+            }
             ctx.fill();
 
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.clip();
+            // SDF Ambient Occlusion Shadow matching global light direction
             const shadowGrad = ctx.createLinearGradient(x - radius, y - radius, x + radius, y + radius);
             shadowGrad.addColorStop(0, "rgba(255,255,255,0.4)"); 
             shadowGrad.addColorStop(0.4, "rgba(0,0,0,0)");
             shadowGrad.addColorStop(1, "rgba(0,0,0,0.85)"); 
             ctx.fillStyle = shadowGrad;
             ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-            ctx.restore();
 
             // Specular Highlight
-            ctx.save();
             ctx.globalAlpha = eyeGenome.highlightStrength;
             ctx.fillStyle = "rgb(255,255,255)";
             ctx.beginPath();
             ctx.arc(x - pupilR * 0.4, y - pupilR * 0.4, Math.max(0.8, pupilR * 0.3), 0, Math.PI * 2);
             ctx.fill();
-            ctx.restore();
 
-            // Eyelids
-            ctx.save();
-            ctx.fillStyle = `rgb(${sR | 0}, ${sG | 0}, ${sB | 0})`;
-            if (eyeGenome.eyelidTop > 0.02) {
-                const h = radius * 2 * eyeGenome.eyelidTop;
-                ctx.fillRect(x - radius * 1.05, y - radius * 1.05, radius * 2.1, h);
-            }
-            if (eyeGenome.eyelidBottom > 0.02) {
-                const h = radius * 2 * eyeGenome.eyelidBottom;
-                ctx.fillRect(x - radius * 1.05, y + radius * 1.05 - h, radius * 2.1, h);
-            }
             ctx.restore();
+            ctx.strokeStyle = `rgb(${Math.max(0, sR - 30)}, ${Math.max(0, sG - 30)}, ${Math.max(0, sB - 30)})`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x - radius, y);
+            ctx.quadraticCurveTo(x, topCtrlY, x + radius, y);
+            ctx.quadraticCurveTo(x, botCtrlY, x - radius, y);
+            ctx.stroke();
         }
     }
 
@@ -331,42 +323,54 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const numSeed = parseInt(seed, 10);
-      
-      // Pull pure geometry and material rules from the script
       const alien = generateAlien(numSeed);
 
       const allBones = alien.geometry.allBones;
       const head = alien.geometry.head;
+      const eyePositions = alien.geometry.eyePositions;
       const [baseR, baseG, baseB] = alien.materials.baseColorRGB;
       const eyeColorRGB = alien.materials.eyeColorRGB;
       
+      fitToBounds(allBones, head, eyePositions, canvas.width, canvas.height, 60);
 
-      const scale = fitToBounds(allBones, head, canvas.width, canvas.height, 60);
-      const k = alien.materials.smoothingK * scale;
-
-  
       const imgData = ctx.createImageData(canvas.width, canvas.height);
       const data = imgData.data;
       const eps = 1.0;
+      
+      const patType = alien.genome.skinPattern;
+      const patScale = 0.05 * (1 + patType * 2);
 
       for (let py = 0; py < canvas.height; py++) {
         for (let px = 0; px < canvas.width; px++) {
-          const d = evaluateField(px, py, allBones, k);
+          // evaluateField no longer needs a global 'k', each bone supplies its own dynamically
+          const d = evaluateField(px, py, allBones);
+          
           if (d < 1.0) {
             const idx = (py * canvas.width + px) * 4;
             const alpha = Math.max(0, Math.min(1, 1.0 - d));
-            const dx = evaluateField(px + eps, py, allBones, k) - d;
-            const dy = evaluateField(px, py + eps, allBones, k) - d;
+            
+            const dx = evaluateField(px + eps, py, allBones) - d;
+            const dy = evaluateField(px, py + eps, allBones) - d;
             const nz = 1.5;
             const nLen = Math.hypot(dx, dy, nz);
             const nx = dx / nLen, ny = dy / nLen, normZ = nz / nLen;
+            
             const lx = -0.5, ly = -0.5, lz = 0.8;
             const dot = Math.max(0, nx * lx + ny * ly + normZ * lz);
             const intensity = 0.25 + dot * 0.75;
 
-            data[idx] = Math.min(255, baseR * intensity);
-            data[idx + 1] = Math.min(255, baseG * intensity);
-            data[idx + 2] = Math.min(255, baseB * intensity);
+            // Skin Pattern 2D Volumetric lookup
+            const noiseVal = noise2D(px * patScale, py * patScale);
+            const patternMod = getSkinPatternMod(noiseVal, patType);
+            
+            // Darken base color where pattern is active
+            const pR = baseR * (1 - patternMod * 0.5);
+            const pG = baseG * (1 - patternMod * 0.5);
+            const pB = baseB * (1 - patternMod * 0.5);
+
+            data[idx] = Math.min(255, pR * intensity);
+            data[idx + 1] = Math.min(255, pG * intensity);
+            data[idx + 2] = Math.min(255, pB * intensity);
             data[idx + 3] = alpha * 255;
           }
         }
@@ -374,8 +378,7 @@
 
       ctx.putImageData(imgData, 0, 0);
 
-      drawEyes(ctx, alien.eyes, head, [baseR, baseG, baseB], eyeColorRGB);
-      
+      drawEyes(ctx, alien.eyes, eyePositions, [baseR, baseG, baseB], eyeColorRGB);
       updateFavicon(canvas);
 
       return alien;

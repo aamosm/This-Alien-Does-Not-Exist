@@ -10,9 +10,6 @@ function mulberry32(a) {
     }
 }
 
-/* ============================================================
-   Sub-seed Generator
-   ============================================================ */
 function subSeed(masterSeed, salt) {
     let h = (masterSeed ^ 0) >>> 0;
     for (let i = 0; i < salt.length; i++) {
@@ -28,7 +25,6 @@ function lerp(a, b, t) {
     return a + (b - a) * t; 
 }
 
-// Reusable weighted distribution helper for genome discrete choices
 function weightedChoice(rng, choices) {
     let totalWeight = 0;
     for (let i = 0; i < choices.length; i++) totalWeight += choices[i][0];
@@ -54,6 +50,21 @@ function noise1D(x) {
     return a * (1 - u) + b * u;
 }
 
+function hash21(x, y) {
+    let n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+    return n - Math.floor(n);
+}
+
+function noise2D(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+    const v00 = hash21(ix, iy), v10 = hash21(ix + 1, iy);
+    const v01 = hash21(ix, iy + 1), v11 = hash21(ix + 1, iy + 1);
+    const vx0 = lerp(v00, v10, ux), vx1 = lerp(v01, v11, ux);
+    return lerp(vx0, vx1, uy);
+}
+
 /* ============================================================
    Genome Generation (Dependency Graph Root)
    ============================================================ */
@@ -77,6 +88,11 @@ function generateGenome(seed) {
         [0.05, "Winged"]
     ]);
 
+    const ecology = weightedChoice(skRng, [
+        [0.45, "Predator"],
+        [0.40, "Prey"],
+        [0.15, "Generalist"]
+    ]);
 
     let limbPairs = 2; 
     let bodyLengthMult = 1.0;
@@ -84,9 +100,7 @@ function generateGenome(seed) {
 
     switch(bodyPlan) {
         case "Serpentine": limbPairs = 0; bodyLengthMult = 1.8; tailLengthMult = 1.5; break;
-        case "Biped": limbPairs = 2; break;
-        case "Quadruped": limbPairs = 2; break;
-        case "Winged": limbPairs = 2; break; 
+        case "Biped": case "Quadruped": case "Winged": limbPairs = 2; break; 
         case "Tripod": limbPairs = weightedChoice(limbRng, [[0.5, 1], [0.5, 2]]); break;
         case "Insectoid": limbPairs = 3; break;
         case "Arachnoid": limbPairs = 4; break;
@@ -94,25 +108,9 @@ function generateGenome(seed) {
         case "Radial": limbPairs = weightedChoice(limbRng, [[0.5, 3], [0.5, 4]]); bodyLengthMult = 0.3; break;
     }
 
-
-    const eyeCount = weightedChoice(headRng, [
-        [0.05, 0], // Blind
-        [0.10, 1], // Cyclops
-        [0.60, 2], // Standard two
-        [0.10, 4],
-        [0.05, 6],
-        [0.05, 8]
-    ]);
-
-    const hornCount = weightedChoice(headRng, [
-        [0.55, 0],
-        [0.30, 2],
-        [0.10, 4],
-        [0.05, 6]
-    ]);
-
     return {
         bodyPlan,
+        ecology,
         mass: lerp(500, 50000, skew(skRng, 2.2)),
         bodyLength: lerp(0.8, 3.5, skRng()) * bodyLengthMult,
         bodyWidth: lerp(0.3, 2.2, skRng()),
@@ -127,7 +125,6 @@ function generateGenome(seed) {
         footSpread: lerp(0.5, 3.5, limbRng()),
         stance: limbRng(),
         
-        // Advanced Head Topography
         headSize: lerp(0.4, 2.0, headRng()),
         headWidth: lerp(0.4, 2.0, headRng()),
         snoutLength: lerp(0.1, 2.8, skew(headRng, 1.5)),
@@ -136,9 +133,12 @@ function generateGenome(seed) {
         chinTaper: lerp(0.2, 1.2, headRng()),
         headTilt: lerp(-0.4, 0.4, headRng()),
         
-        eyeCount, 
-        hornCount,
+        eyeCount: weightedChoice(headRng, [[0.05, 0], [0.10, 1], [0.60, 2], [0.10, 4], [0.05, 6], [0.05, 8]]),
+        hornCount: weightedChoice(headRng, [[0.55, 0], [0.30, 2], [0.10, 4], [0.05, 6]]),
         
+        mouthType: weightedChoice(headRng, [[0.3, "Jaw"], [0.25, "Mandibles"], [0.2, "Beak"], [0.15, "Proboscis"], [0.1, "Filter"]]),
+        mouthSize: lerp(0.3, 1.2, headRng()),
+
         skinHue: skinRng(),
         skinBrightness: skinRng(),
         skinPattern: skinRng(),
@@ -146,7 +146,7 @@ function generateGenome(seed) {
 }
 
 /* ============================================================
-   Skeleton Construction: Spine
+   Skeleton Construction: Spine & Tail
    ============================================================ */
 function buildSpine(genome, formRng, startX, startY) {
     const sizeScale = Math.pow(genome.mass / 5000, 0.28);
@@ -178,9 +178,6 @@ function buildSpine(genome, formRng, startX, startY) {
     return nodes;
 }
 
-/* ============================================================
-   Skeleton Construction: Tail
-   ============================================================ */
 function buildTail(genome, formRng, lastNode) {
     if (genome.tailLength < 0.15) return [];
     const sizeScale = Math.pow(genome.mass / 5000, 0.28);
@@ -200,7 +197,7 @@ function buildTail(genome, formRng, lastNode) {
 }
 
 /* ============================================================
-   Skeleton Construction: Head (Sculpted Topology)
+   Skeleton Construction: Head & Mouth
    ============================================================ */
 function buildHead(genome, formRng, spine) {
     const bodyTop = spine[0];
@@ -208,28 +205,46 @@ function buildHead(genome, formRng, spine) {
     const craniumR = bodyTop.r * genome.headSize * genome.headWidth;
     const neckLen = (10 + genome.neckLength * 40) * sizeScale;
     const hx = bodyTop.x, hy = bodyTop.y - neckLen;
+    const kFactor = 0.5 + formRng() * 0.3;
 
     const bones = [];
     
-    // Neck to Cranium Base
-    bones.push({ ax: hx, ay: hy, bx: bodyTop.x, by: bodyTop.y, r1: craniumR * 0.7, r2: bodyTop.r });
+    // Neck to Cranium
+    bones.push({ ax: hx, ay: hy, bx: bodyTop.x, by: bodyTop.y, r1: craniumR * 0.7, r2: bodyTop.r, k: Math.max(craniumR, bodyTop.r) * kFactor });
 
     // Cranium Dome
     const craniumTopY = hy - craniumR * genome.foreheadHeight;
-    bones.push({ ax: hx, ay: hy, bx: hx, by: craniumTopY, r1: craniumR, r2: craniumR * 0.75 });
+    bones.push({ ax: hx, ay: hy, bx: hx, by: craniumTopY, r1: craniumR, r2: craniumR * 0.75, k: craniumR * kFactor });
 
     // Snout
     const tilt = genome.headTilt * Math.PI;
     const snoutL = craniumR * genome.snoutLength * 1.5;
     const snoutX = hx + Math.sin(tilt) * snoutL;
     const snoutY = hy + Math.cos(tilt) * snoutL + craniumR * 0.2;
-    bones.push({ ax: hx, ay: hy, bx: snoutX, by: snoutY, r1: craniumR * 0.85, r2: craniumR * genome.chinTaper });
+    bones.push({ ax: hx, ay: hy, bx: snoutX, by: snoutY, r1: craniumR * 0.85, r2: craniumR * genome.chinTaper, k: craniumR * kFactor });
 
-    // Jaw
+    // Lower Jaw
     const jawL = craniumR * genome.jawDepth * 1.3;
     const jawX = hx + Math.sin(tilt - 0.2) * jawL;
     const jawY = hy + Math.cos(tilt - 0.2) * jawL + craniumR * 0.5;
-    bones.push({ ax: hx, ay: hy, bx: jawX, by: jawY, r1: craniumR * 0.75, r2: craniumR * genome.chinTaper * 0.6 });
+    bones.push({ ax: hx, ay: hy, bx: jawX, by: jawY, r1: craniumR * 0.75, r2: craniumR * genome.chinTaper * 0.6, k: craniumR * kFactor });
+
+    // Mouth Apparatus
+    const mouthL = craniumR * genome.mouthSize * 1.2;
+    if (genome.mouthType === "Beak") {
+        bones.push({ ax: snoutX, ay: snoutY, bx: snoutX + Math.sin(tilt)*mouthL, by: snoutY + Math.cos(tilt)*mouthL, r1: craniumR*0.3, r2: 1, k: craniumR*0.15 });
+    } else if (genome.mouthType === "Mandibles") {
+        bones.push({ ax: snoutX, ay: snoutY, bx: snoutX + Math.sin(tilt+0.5)*mouthL, by: snoutY + Math.cos(tilt+0.5)*mouthL, r1: craniumR*0.25, r2: 1, k: craniumR*0.1 });
+        bones.push({ ax: snoutX, ay: snoutY, bx: snoutX + Math.sin(tilt-0.5)*mouthL, by: snoutY + Math.cos(tilt-0.5)*mouthL, r1: craniumR*0.25, r2: 1, k: craniumR*0.1 });
+    } else if (genome.mouthType === "Proboscis") {
+        let px = snoutX, py = snoutY, pr = craniumR * 0.2;
+        for(let i=0; i<3; i++) {
+            const nx = px + Math.sin(tilt - i*0.4) * mouthL * 0.5;
+            const ny = py + Math.cos(tilt - i*0.4) * mouthL * 0.5;
+            bones.push({ ax: px, ay: py, bx: nx, by: ny, r1: pr, r2: pr*0.7, k: pr*1.5 });
+            px = nx; py = ny; pr *= 0.7;
+        }
+    }
 
     // Horns
     for (let i = 0; i < genome.hornCount; i++) {
@@ -238,41 +253,47 @@ function buildHead(genome, formRng, spine) {
         const len = craniumR * (0.8 + formRng() * 0.8);
         const bx = hx + Math.cos(angle) * len;
         const by = craniumTopY + Math.sin(angle) * len;
-        bones.push({ ax: hx, ay: craniumTopY, bx, by, r1: craniumR * 0.2, r2: craniumR * 0.02 });
+        bones.push({ ax: hx, ay: craniumTopY, bx, by, r1: craniumR * 0.2, r2: craniumR * 0.02, k: craniumR * 0.1 });
     }
 
-    // Blend focal point between dome and snout for eye socket placement
     const focusY = lerp(craniumTopY, snoutY, 0.4);
     
     return { 
         bones, 
         headCenter: { x: hx + Math.sin(tilt) * snoutL * 0.25, y: focusY }, 
-        headR: craniumR * 1.1 // Slightly inflate radius for eye scattering
+        headR: craniumR * 1.1 
     };
 }
 
 /* ============================================================
-   Eye Genome & Layout Data
+   Eye Ecology & Layout
    ============================================================ */
-function generateEyeGenome(seed, eyeCount) {
+function generateEyeGenome(seed, genome) {
     const rng = mulberry32(subSeed(seed, "traits-eyes"));
     const skew = (p) => Math.pow(rng(), p);
 
+    const isPredator = genome.ecology === "Predator";
+    const isPrey = genome.ecology === "Prey";
+
+    let pupilType = "round";
+    if (isPredator) pupilType = "slit";
+    else if (isPrey) pupilType = "horizontal";
+
     return {
-        eyeCount,
+        eyeCount: genome.eyeCount,
         clusterRadius: lerp(0.18, 0.8, rng()),
-        clusterRotation: lerp(-0.55, 0.55, skew(1.4)) * Math.PI, 
+        clusterRotation: isPredator ? lerp(-0.15, 0.15, rng()) * Math.PI : lerp(0.3, 0.6, rng()) * Math.PI, 
         symmetry: lerp(0.35, 1.0, skew(0.6)),
         eyeRadius: lerp(0.05, 0.22, rng()),
         eyeRadiusVariation: lerp(0, 0.45, rng()),
         irisRadius: lerp(0.5, 0.9, rng()),
         pupilRadius: lerp(0.22, 0.6, rng()),
-        pupilShape: rng(), 
-        eyelidTop: lerp(0, 0.4, skew(1.6)),
-        eyelidBottom: lerp(0, 0.28, skew(1.9)),
+        pupilType: pupilType, 
+        eyelidTop: lerp(0.05, 0.4, skew(1.6)),
+        eyelidBottom: lerp(0.05, 0.28, skew(1.9)),
         socketDepth: rng(),
-        eyeSpacing: lerp(0.55, 1.7, rng()),
-        eyeBulge: rng(),
+        eyeSpacing: isPredator ? lerp(0.3, 0.8, rng()) : lerp(1.0, 1.8, rng()),
+        eyeBulge: isPrey ? lerp(0.4, 1.0, rng()) : lerp(0.0, 0.4, rng()),
         eyeColor: rng(),
         irisPattern: rng(),
         highlightStrength: lerp(0.25, 1.0, rng()),
@@ -281,7 +302,7 @@ function generateEyeGenome(seed, eyeCount) {
     };
 }
 
-function computeEyePositions(eyeGenome, headCenter, headR) {
+function computeEyePositions(eyeGenome, headCenter, headR, allBones) {
     const n = eyeGenome.eyeCount;
     const positions = [];
     if (n === 0) return positions;
@@ -302,19 +323,31 @@ function computeEyePositions(eyeGenome, headCenter, headR) {
 
         const radiusJitter = 1 + (noise1D(i * 7.7 + phase + 40) - 0.5) * 0.3 * jitterAmt;
         const rawR = eyeGenome.clusterRadius * headR * radiusJitter;
-        const r = Math.min(rawR, headR - eyeR * 0.6); 
+        const targetR = Math.min(rawR, headR); 
 
-        positions.push({
-            x: headCenter.x + Math.cos(angle) * r,
-            y: headCenter.y + Math.sin(angle) * r * 0.85,
-            radius: eyeR
-        });
+        // Initial skeletal coordinate
+        let px = headCenter.x + Math.cos(angle) * targetR;
+        let py = headCenter.y + Math.sin(angle) * targetR;
+
+        // Exact SDF Flesh Snapping (Gradient walk to surface boundary d=0)
+        let dirX = Math.cos(angle);
+        let dirY = Math.sin(angle);
+        for (let step = 0; step < 15; step++) {
+            let d = evaluateField(px, py, allBones);
+            if (Math.abs(d) < 1.0) break; 
+            // If d is negative (inside flesh), subtracting pushes outward (+dirX)
+            // If d is positive (floating), subtracting pushes inward (-dirX)
+            px -= dirX * d * 0.8;
+            py -= dirY * d * 0.8;
+        }
+
+        positions.push({ x: px, y: py, radius: eyeR });
     }
     return positions;
 }
 
 /* ============================================================
-   Skeleton Construction: Limbs (Body Plan Dependent)
+   Skeleton Construction: Limbs (Allometric Proximal Tapering)
    ============================================================ */
 function buildLimbs(genome, formRng, spine) {
     const bones = [];
@@ -323,13 +356,10 @@ function buildLimbs(genome, formRng, spine) {
     let bodyStart = Math.floor(spine.length * 0.15);
     let bodyEnd = Math.floor(spine.length * 0.85);
 
-    // Apply Body Plan morphological overrides to limb origins
     if (genome.bodyPlan === "Cephalopod") {
-        bodyStart = 0; 
-        bodyEnd = Math.floor(spine.length * 0.15); 
+        bodyStart = 0; bodyEnd = Math.floor(spine.length * 0.15); 
     } else if (genome.bodyPlan === "Radial") {
-        bodyStart = Math.floor(spine.length * 0.35);
-        bodyEnd = Math.floor(spine.length * 0.65); 
+        bodyStart = Math.floor(spine.length * 0.35); bodyEnd = Math.floor(spine.length * 0.65); 
     }
 
     for (let p = 0; p < genome.limbPairs; p++) {
@@ -338,10 +368,10 @@ function buildLimbs(genome, formRng, spine) {
         const attach = spine[idx];
 
         [-1, 1].forEach(side => {
-            let legLenPx = (20 + genome.legLength * 55) * Math.pow(genome.mass / 5000, 0.25);
+            let legLenPx = (20 + genome.legLength * 55) * Math.pow(genome.mass / 5000, 0.3);
             
-            if (genome.bodyPlan === "Biped" && p === 0) legLenPx *= 0.4;
-            if (genome.bodyPlan === "Winged" && p === 0) legLenPx *= 1.8;
+            if (genome.bodyPlan === "Biped" && p === 0) legLenPx *= 0.4; 
+            if (genome.bodyPlan === "Winged" && p === 0) legLenPx *= 1.8; 
 
             const segCount = genome.limbSegments;
             const chain = [{ x: attach.x, y: attach.y }];
@@ -372,20 +402,25 @@ function buildLimbs(genome, formRng, spine) {
 
             solveFABRIK(chain, targetX, targetY);
 
-            let diam = (4 + genome.bodyWidth * 7) * Math.pow(genome.mass / 5000, 0.28) * (0.5 + formRng() * 0.3);
+            // True Allometric Scaling
+            const baseDiam = (4 + genome.bodyWidth * 7) * Math.pow(genome.mass / 5000, 0.41) * (0.5 + formRng() * 0.3);
+            const kFactor = 0.5 + formRng() * 0.3;
+
             for (let i = 0; i < chain.length - 1; i++) {
-                const nextDiam = diam * 0.72;
-                bones.push({ ax: chain[i].x, ay: chain[i].y, bx: chain[i + 1].x, by: chain[i + 1].y, r1: diam, r2: nextDiam });
-                diam = nextDiam;
+                const t1 = i / (chain.length - 1);
+                const t2 = (i + 1) / (chain.length - 1);
+                
+                // Limbs taper aggressively toward extremities
+                const r1 = lerp(baseDiam, baseDiam * 0.15, Math.pow(t1, 1.5));
+                const r2 = lerp(baseDiam, baseDiam * 0.15, Math.pow(t2, 1.5));
+
+                bones.push({ ax: chain[i].x, ay: chain[i].y, bx: chain[i + 1].x, by: chain[i + 1].y, r1, r2, k: Math.max(r1, r2) * kFactor });
             }
         });
     }
     return bones;
 }
 
-/* ============================================================
-   Inverse Kinematics (FABRIK)
-   ============================================================ */
 function solveFABRIK(chain, targetX, targetY) {
     const n = chain.length;
     const lengths = [];
@@ -447,7 +482,7 @@ function computeBounds(bones) {
     return { minX, minY, maxX, maxY };
 }
 
-function fitToBounds(bones, head, targetW, targetH, padding) {
+function fitToBounds(bones, head, eyes, targetW, targetH, padding) {
     const bounds = computeBounds(bones);
     const w = bounds.maxX - bounds.minX;
     const h = bounds.maxY - bounds.minY;
@@ -466,75 +501,60 @@ function fitToBounds(bones, head, targetW, targetH, padding) {
         b.by = b.by * scale + dy;
         b.r1 *= scale;
         b.r2 *= scale;
+        b.k *= scale;
     }
     
     head.headCenter.x = head.headCenter.x * scale + dx;
     head.headCenter.y = head.headCenter.y * scale + dy;
     head.headR *= scale;
+
+    for (let e of eyes) {
+        e.x = e.x * scale + dx;
+        e.y = e.y * scale + dy;
+        e.radius *= scale;
+    }
     
     return scale;
 }
 
 /* ============================================================
-   Signed Distance Fields (SDF)
+   Signed Distance Fields (SDF) & Exponential Smoothing
    ============================================================ */
 function sdUnevenCapsule(px, py, ax, ay, bx, by, r1, r2) {
-    const dx = bx - ax;
-    const dy = by - ay;
+    const dx = bx - ax, dy = by - ay;
     const L = Math.sqrt(dx * dx + dy * dy);
-    
-    if (L === 0) {
-        const dpx = px - ax, dpy = py - ay;
-        return Math.sqrt(dpx * dpx + dpy * dpy) - Math.max(r1, r2);
-    }
-    
+    if (L === 0) return Math.sqrt((px-ax)**2 + (py-ay)**2) - Math.max(r1, r2);
     if (L <= Math.abs(r1 - r2)) {
-        if (r1 > r2) {
-            const dpx = px - ax, dpy = py - ay;
-            return Math.sqrt(dpx * dpx + dpy * dpy) - r1;
-        } else {
-            const dpx = px - bx, dpy = py - by;
-            return Math.sqrt(dpx * dpx + dpy * dpy) - r2;
-        }
+        if (r1 > r2) return Math.sqrt((px-ax)**2 + (py-ay)**2) - r1;
+        else return Math.sqrt((px-bx)**2 + (py-by)**2) - r2;
     }
 
-    const dirX = dx / L;
-    const dirY = dy / L;
-    
-    const tx = px - ax;
-    const ty = py - ay;
-    
+    const dirX = dx / L, dirY = dy / L;
+    const tx = px - ax, ty = py - ay;
     const y = tx * dirX + ty * dirY; 
     const x = Math.abs(tx * -dirY + ty * dirX); 
-    
     const sinT = (r1 - r2) / L;
     const cosT = Math.sqrt(Math.max(0.0, 1.0 - sinT * sinT));
-    
     const proj = y * cosT - x * sinT;
     
-    if (proj <= 0.0) {
-        return Math.sqrt(x * x + y * y) - r1;
-    }
-    if (proj >= L * cosT) {
-        const yL = y - L;
-        return Math.sqrt(x * x + yL * yL) - r2;
-    }
-    
+    if (proj <= 0.0) return Math.sqrt(x * x + y * y) - r1;
+    if (proj >= L * cosT) return Math.sqrt(x * x + (y-L)**2) - r2;
     return x * cosT + y * sinT - r1;
 }
 
-function sminCubic(a, b, k) {
-    const h = Math.max(0, Math.min(1, 0.5 + 0.5 * (b - a) / k));
-    return b + (a - b) * h - k * h * (1.0 - h);
+function sminExp(a, b, k) {
+    const h = Math.max(k, 0.0001);
+    const m = Math.min(a, b);
+    return m - h * Math.log(Math.exp((m - a) / h) + Math.exp((m - b) / h));
 }
 
-function evaluateField(px, py, bones, k) {
+function evaluateField(px, py, bones) {
     if (bones.length === 0) return Infinity;
     let d = sdUnevenCapsule(px, py, bones[0].ax, bones[0].ay, bones[0].bx, bones[0].by, bones[0].r1, bones[0].r2);
     for (let i = 1; i < bones.length; i++) {
         const b = bones[i];
         const dist = sdUnevenCapsule(px, py, b.ax, b.ay, b.bx, b.by, b.r1, b.r2);
-        d = sminCubic(d, dist, k);
+        d = sminExp(d, dist, b.k); 
     }
     return d;
 }
@@ -567,7 +587,6 @@ function classifyCreature(genome) {
     const legRatio = genome.legLength / genome.bodyLength;
     const isHeavy = genome.mass > 20000;
 
-    // Locomotion
     if (genome.bodyPlan === "Serpentine") facts.locomotion = "Slithering";
     else if (genome.bodyPlan === "Sessile" || genome.limbPairs === 0) facts.locomotion = "Immobile";
     else if (genome.bodyPlan === "Floating") facts.locomotion = "Buoyant";
@@ -578,29 +597,26 @@ function classifyCreature(genome) {
     else if (genome.limbPairs >= 3) facts.locomotion = "Crawler";
     else facts.locomotion = "Generalist";
 
-    // Size
     if (genome.mass < 2000) facts.size = "Small";
     else if (genome.mass < 10000) facts.size = "Medium";
     else if (genome.mass < 30000) facts.size = "Large";
     else facts.size = "Massive";
 
-    // Diet derived structurally
-    if (genome.bodyPlan === "Sessile" || genome.bodyPlan === "Floating") facts.diet = "Filter Feeder";
+    if (genome.ecology === "Prey" && genome.mouthType === "Jaw") facts.diet = "Herbivore (Grazer)";
     else if (genome.mass > 15000 && genome.neckLength > 1.5) facts.diet = "Herbivore (High Browser)";
-    else if (legRatio > 1.8 && genome.mass < 8000) facts.diet = "Carnivore (Pursuit)";
-    else if (genome.bodyPlan === "Arachnoid" || genome.bodyPlan === "Serpentine") facts.diet = "Carnivore (Ambush)";
-    else if (genome.snoutLength > 1.5) facts.diet = "Insectivore (Prober)";
+    else if (genome.ecology === "Predator" && genome.mouthType === "Mandibles") facts.diet = "Carnivore (Shredder)";
+    else if (genome.ecology === "Predator" && legRatio > 1.8) facts.diet = "Carnivore (Pursuit)";
+    else if (genome.ecology === "Predator") facts.diet = "Carnivore (Ambush)";
+    else if (genome.mouthType === "Proboscis") facts.diet = "Nectarivore / Fluid Feeder";
+    else if (genome.mouthType === "Filter") facts.diet = "Filter Feeder";
     else facts.diet = "Omnivore";
 
-    // Vision derived structurally
     if (genome.eyeCount === 0) facts.vision = "Blind (Echolocation)";
-    else if (genome.eyeCount >= 6) facts.vision = "Excellent Depth Perception";
-    else if (genome.eyeSpacing > 1.3) facts.vision = "Panoramic Vision";
-    else if (genome.pupilShape > 0.7) facts.vision = "Motion-Sensitive";
-    else if (genome.eyeRadius > 0.18) facts.vision = "Nocturnal (Large Eyes)";
-    else facts.vision = "Binocular Vision";
+    else if (genome.eyeCount >= 6) facts.vision = "Multiocular Motion Sense";
+    else if (genome.ecology === "Prey") facts.vision = "Panoramic Vision";
+    else if (genome.ecology === "Predator") facts.vision = "Binocular (Depth Precision)";
+    else facts.vision = "Standard Binocular";
 
-    // Temperament
     const temperaments = ["Docile", "Territorial", "Skittish", "Curious", "Aggressive", "Solitary"];
     const idx = Math.floor(((genome.stance + genome.skinPattern) / 2) * temperaments.length) % temperaments.length;
     facts.temperament = temperaments[idx];
@@ -611,7 +627,6 @@ function classifyCreature(genome) {
 function generateAlien(seed) {
     const genome = generateGenome(seed);
     const facts = classifyCreature(genome);
-    const eyes = generateEyeGenome(seed, genome.eyeCount);
     
     const formRngSpine = mulberry32(subSeed(seed, "form-spine"));
     const formRngTail = mulberry32(subSeed(seed, "form-tail"));
@@ -625,48 +640,42 @@ function generateAlien(seed) {
 
     const spineBones = [];
     for (let i = 0; i < spine.length - 1; i++) {
-        spineBones.push({ ax: spine[i].x, ay: spine[i].y, bx: spine[i + 1].x, by: spine[i + 1].y, r1: spine[i].r, r2: spine[i + 1].r });
+        const r1 = spine[i].r, r2 = spine[i + 1].r;
+        spineBones.push({ ax: spine[i].x, ay: spine[i].y, bx: spine[i + 1].x, by: spine[i + 1].y, r1, r2, k: Math.max(r1, r2) * (0.5 + formRngSpine()*0.3) });
     }
     const tailBones = [];
     let prev = spine[spine.length - 1];
     for (const node of tail) {
-        tailBones.push({ ax: prev.x, ay: prev.y, bx: node.x, by: node.y, r1: prev.r, r2: node.r });
+        tailBones.push({ ax: prev.x, ay: prev.y, bx: node.x, by: node.y, r1: prev.r, r2: node.r, k: Math.max(prev.r, node.r) * 0.4 });
         prev = node;
     }
 
     const allBones = [...spineBones, ...tailBones, ...head.bones, ...limbBones];
     
-    const globalFormRng = mulberry32(subSeed(seed, "form-global"));
-    const baseThickness = allBones.length > 0 ? allBones[0].r1 : 10;
-    
+    // Snapped Eye Geometry calculated against the full SDF
+    const eyeGenome = generateEyeGenome(seed, genome);
+    const eyePositions = computeEyePositions(eyeGenome, head.headCenter, head.headR, allBones);
+
     return {
         seed: seed,
         genome: genome,
         facts: facts,
-        eyes: eyes,
+        eyes: eyeGenome,
         geometry: {
             spine: spineBones,
             tail: tailBones,
             limbs: limbBones,
             head: head,
+            eyePositions: eyePositions,
             allBones: allBones
         },
         materials: {
             baseColorRGB: computeSkinColor(genome),
-            eyeColorRGB: hslToRgb(eyes.eyeColor * 360, 60, 45), 
-            smoothingK: baseThickness * (0.5 + globalFormRng() * 0.3)
+            eyeColorRGB: hslToRgb(eyeGenome.eyeColor * 360, 60, 45)
         }
     };
 }
 
-
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { 
-        generateAlien, 
-        evaluateField, 
-        fitToBounds, 
-        computeBounds,
-        generateEyeGenome,
-        computeEyePositions
-    };
+    module.exports = { generateAlien, evaluateField, fitToBounds, noise2D };
 }
