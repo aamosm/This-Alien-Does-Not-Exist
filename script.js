@@ -36,18 +36,6 @@ function weightedChoice(rng, choices) {
     return choices[choices.length - 1][1];
 }
 
-function hash11(n) {
-    n = Math.sin(n) * 43758.5453;
-    return n - Math.floor(n);
-}
-
-function noise1D(x) {
-    const i = Math.floor(x); const f = x - i;
-    const a = hash11(i); const b = hash11(i + 1);
-    const u = f * f * (3 - 2 * f);
-    return a * (1 - u) + b * u;
-}
-
 function hash21(x, y) {
     let n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
     return n - Math.floor(n);
@@ -72,7 +60,7 @@ function hslToRgb(h, s, l) {
 }
 
 /* ============================================================
-   1. BODY PLAN CONFIGURATIONS
+   BODY PLAN CONFIGURATIONS
    ============================================================ */
 const BodyPlanConfigs = {
     Vertebrate: { thoraxRatio: 0.30, pelvisRatio: 0.75, segmentCount: 6, allowsLimbs: true },
@@ -89,7 +77,7 @@ const BodyPlanConfigs = {
 };
 
 /* ============================================================
-   2. PRIMITIVE SYSTEM (CSG Engine)
+   PRIMITIVE SYSTEM
    ============================================================ */
 class Primitive {
     constructor(type, op = 'smooth_add', k = 5) { this.type = type; this.op = op; this.k = k; }
@@ -97,6 +85,7 @@ class Primitive {
     bounds() { return { minX: 0, minY: 0, maxX: 0, maxY: 0 }; }
     translate(dx, dy) {}
     scale(s) { this.k *= s; }
+    squeezeAxis(axis, factor, center) {}
 }
 
 class Sphere extends Primitive {
@@ -105,6 +94,10 @@ class Sphere extends Primitive {
     bounds() { return { minX: this.x - this.r, minY: this.y - this.r, maxX: this.x + this.r, maxY: this.y + this.r }; }
     translate(dx, dy) { this.x += dx; this.y += dy; }
     scale(s) { super.scale(s); this.x *= s; this.y *= s; this.r *= s; }
+    squeezeAxis(axis, factor, center) {
+        if (axis === 'x') this.x = center + (this.x - center) * factor;
+        else this.y = center + (this.y - center) * factor;
+    }
 }
 
 class Capsule extends Primitive {
@@ -129,6 +122,10 @@ class Capsule extends Primitive {
     }
     translate(dx, dy) { this.ax += dx; this.ay += dy; this.bx += dx; this.by += dy; }
     scale(s) { super.scale(s); this.ax *= s; this.ay *= s; this.bx *= s; this.by *= s; this.r1 *= s; this.r2 *= s; }
+    squeezeAxis(axis, factor, center) {
+        if (axis === 'x') { this.ax = center + (this.ax - center) * factor; this.bx = center + (this.bx - center) * factor; }
+        else { this.ay = center + (this.ay - center) * factor; this.by = center + (this.by - center) * factor; }
+    }
 }
 
 class Ellipsoid extends Primitive {
@@ -145,6 +142,10 @@ class Ellipsoid extends Primitive {
     }
     translate(dx, dy) { this.x += dx; this.y += dy; }
     scale(s) { super.scale(s); this.x *= s; this.y *= s; this.rx *= s; this.ry *= s; }
+    squeezeAxis(axis, factor, center) {
+        if (axis === 'x') this.x = center + (this.x - center) * factor;
+        else this.y = center + (this.y - center) * factor;
+    }
 }
 
 function sminExp(a, b, k) {
@@ -168,7 +169,7 @@ function evaluateField(px, py, primitives) {
 }
 
 /* ============================================================
-   3. CREATURE CONTEXT (The Single Source of Truth)
+   CREATURE CONTEXT
    ============================================================ */
 class CreatureContext {
     constructor(seed) {
@@ -185,8 +186,8 @@ class CreatureContext {
         this.featureData = {};
     }
 
-    registerSocket(name, x, y, dirX = 0, dirY = 1) { 
-        this.sockets[name] = { x, y, dirX, dirY }; 
+    registerSocket(name, x, y, dirX = 0, dirY = 1, radius = 0) {
+        this.sockets[name] = { x, y, dirX, dirY, radius };
     }
     
     getSocket(name) { 
@@ -205,7 +206,7 @@ class CreatureContext {
 }
 
 /* ============================================================
-   4. GENOME GENERATION & CONSTRAINT SOLVERS
+   GENOME GENERATION & CONSTRAINT SOLVERS
    ============================================================ */
 function generateGenome(seed) {
     const rng = mulberry32(subSeed(seed, "genome"));
@@ -230,7 +231,7 @@ function generateGenome(seed) {
         chinTaper: lerp(0.2, 1.2, rng()),
         headTilt: lerp(-0.4, 0.4, rng()),
         neckLengthRaw: skew(1.6),
-        eyeCountRaw: rng(),
+        eyeCount: weightedChoice(rng, [[0.07, 0], [0.10, 1], [0.83, 2]]),
         mouthType: weightedChoice(rng, [[0.3, "Jaw"], [0.25, "Mandibles"], [0.2, "Beak"], [0.15, "Proboscis"], [0.1, "Filter"]]),
         tailLength: lerp(0, 4.0, skew(1.4)),
         tailType: weightedChoice(rng, [[0.5, "Whip"], [0.2, "Club"], [0.2, "Paddle"], [0.1, "Forked"]]),
@@ -293,7 +294,7 @@ function applyConstraints(genome) {
 }
 
 /* ============================================================
-   5. MODULE BASE CLASS
+   MODULE BASE CLASS
    ============================================================ */
 class CreatureModule {
     constructor(ctx, rng) {
@@ -316,14 +317,14 @@ class CreatureModule {
         const sock = this.ctx.getSocket(socketName);
         if (sock) childModule.build(sock.x, sock.y, sock.dirX, sock.dirY);
     }
-    registerLocalSocket(name, offsetX, offsetY, dirX = 0, dirY = 1) {
-        this.ctx.registerSocket(name, this.worldX + offsetX, this.worldY + offsetY, dirX, dirY);
+    registerLocalSocket(name, offsetX, offsetY, dirX = 0, dirY = 1, radius = 0) {
+        this.ctx.registerSocket(name, this.worldX + offsetX, this.worldY + offsetY, dirX, dirY, radius);
     }
     generate() { /* Virtual */ }
 }
 
 /* ============================================================
-   6. ANATOMICAL MODULES
+   ANATOMICAL MODULES
    ============================================================ */
 class TorsoVertebrate extends CreatureModule {
     generate() {
@@ -448,11 +449,31 @@ class HeadModule extends CreatureModule {
         const socketX = this.genome.eyePlacement === "Forward" ? snoutL * 0.4 : craniumR * 0.2;
         const eyeY = craniumY - craniumR * 0.2;
 
-        this.primitives.push(new Sphere(craniumX + socketX, eyeY, craniumR * 0.4, 'subtract', 0));
-        this.primitives.push(new Sphere(craniumX - socketX, eyeY, craniumR * 0.4, 'subtract', 0));
+        const outwardNormal = (cx, cy) => {
+            const dx = cx - craniumX, dy = cy - craniumY;
+            const len = Math.hypot(dx, dy);
+            return len > 1e-6 ? { x: dx / len, y: dy / len } : { x: 0, y: -1 };
+        };
 
-        this.registerLocalSocket('eye_R', craniumX - this.worldX + socketX, eyeY - this.worldY, 1, 0);
-        this.registerLocalSocket('eye_L', craniumX - this.worldX - socketX, eyeY - this.worldY, -1, 0);
+        if (this.genome.eyeCount === 1) {
+            const eR = craniumR * 0.32;
+            const cx = craniumX, cy = eyeY;
+            const n = outwardNormal(cx, cy);
+            this.primitives.push(new Sphere(cx, cy, eR, 'subtract', 0));
+            this.registerLocalSocket('eye_C', cx - this.worldX, cy - this.worldY, n.x, n.y, eR);
+        } else if (this.genome.eyeCount === 2) {
+            const eR = craniumR * 0.28;
+            ['L', 'R'].forEach(side => {
+                const dir = side === 'L' ? -1 : 1;
+                const asymMult = 1 + dir * this.genome.asymmetryBias * this.genome.asymmetry * 0.25;
+                const r = eR * asymMult;
+                const cx = craniumX + dir * socketX, cy = eyeY;
+                const n = outwardNormal(cx, cy);
+                this.primitives.push(new Sphere(cx, cy, r, 'subtract', 0));
+                this.registerLocalSocket('eye_' + side, cx - this.worldX, cy - this.worldY, n.x, n.y, r);
+            });
+        }
+
         this.registerLocalSocket('mouth', snoutX - this.worldX, snoutY - this.worldY, 0, 1);
         
         this.ctx.geometry.head.headCenter = { x: craniumX + Math.sin(tilt) * snoutL * 0.25, y: lerp(craniumY, snoutY, 0.4) };
@@ -522,11 +543,15 @@ class LimbModule extends CreatureModule {
 
         const baseDiam = (4 + genome.bodyWidth * 7) * Math.pow(genome.mass / 5000, 0.41);
         this.primitives.push(new Capsule(this.worldX, this.worldY, originX, originY, baseDiam * 1.1, baseDiam, 'smooth_add', baseDiam * 0.3));
+
+        const profile = [1.0, 0.72, 0.42, 0.3];
         for (let i = 0; i < chain.length - 1; i++) {
-            const t1 = i / (chain.length - 1), t2 = (i + 1) / (chain.length - 1);
-            const r1 = lerp(baseDiam, baseDiam * 0.15, Math.pow(t1, 1.5)), r2 = lerp(baseDiam, baseDiam * 0.15, Math.pow(t2, 1.5));
-            this.primitives.push(new Capsule(chain[i].x, chain[i].y, chain[i+1].x, chain[i+1].y, r1, r2, 'smooth_add', baseDiam * 0.1));
+            const r1 = baseDiam * profile[i], r2 = baseDiam * profile[i + 1];
+            this.primitives.push(new Capsule(chain[i].x, chain[i].y, chain[i + 1].x, chain[i + 1].y, r1, r2, 'smooth_add', baseDiam * 0.12));
         }
+        const foot = chain[chain.length - 1];
+        const footR = baseDiam * profile[profile.length - 1];
+        this.primitives.push(new Sphere(foot.x, foot.y, footR * 1.2, 'smooth_add', footR * 0.3));
     }
 }
 
@@ -574,7 +599,7 @@ class TailModule extends CreatureModule {
 }
 
 /* ============================================================
-   7. TRUE GRAMMAR REGISTRY
+   TRUE GRAMMAR REGISTRY
    ============================================================ */
 class VertebrateGrammar {
     static execute(ctx, rng) {
@@ -659,26 +684,19 @@ const GrammarRegistry = {
 };
 
 /* ============================================================
-   8. FEATURE GENERATORS (Independent Plugin Systems)
+   FEATURE GENERATORS
    ============================================================ */
 class EyeGenerator {
-    static generate(ctx, rng) {
+    static generate(ctx) {
         const genome = ctx.genome;
-        const eyes = [];
-        if (genome.eyeCountRaw > 0.1) {
-            const baseER = ctx.geometry.head.headR * 0.25;
-            ['eye_L', 'eye_R'].forEach(socketName => {
-                const sock = ctx.getSocket(socketName);
-                if (sock) {
-                    const side = socketName === 'eye_L' ? -1 : 1;
-                    const eR = baseER * (1 + side * genome.asymmetryBias * genome.asymmetry * 0.25);
-                    eyes.push({ x: sock.x - sock.dirX * eR * 0.2, y: sock.y - sock.dirY * eR * 0.2, radius: eR });
-                }
-            });
-        }
+        const eyeSocketNames = Object.keys(ctx.sockets).filter(name => name.startsWith('eye_'));
+        const eyes = eyeSocketNames.map(name => {
+            const sock = ctx.getSocket(name);
+            return { x: sock.x, y: sock.y, radius: sock.radius, dirX: sock.dirX, dirY: sock.dirY };
+        });
         ctx.geometry.eyePositions = eyes;
         ctx.eyes = {
-            eyeCount: eyes.length, scleraVisible: true, irisRadius: 0.7, pupilRadius: 0.4,
+            eyeCount: eyes.length, scleraVisible: eyes.length > 0, irisRadius: 0.7, pupilRadius: 0.4,
             pupilType: genome.pupilType, eyelidTop: 0.2, eyelidBottom: 0.2,
             socketDepth: 0.6, highlightStrength: 0.8, irisPattern: 0.5
         };
@@ -698,15 +716,13 @@ class MaterialGenerator {
             accentColorRGB: hslToRgb(accentHue, Math.min(88, sat + 18), Math.max(18, light - 12)),
             highlightColorRGB: hslToRgb(baseHue, Math.max(20, sat - 18), Math.min(88, light + 30)),
             eyeColorRGB: hslToRgb(accentHue + 15, 60, 50),
-            patternScaleMultiplier: 0.05 * Math.pow(5000 / genome.mass, 0.33)
+
+            patternScaleMultiplier: 0.05 * Math.pow(5000 / genome.mass, 0.2) * lerp(1.3, 0.7, Math.min(1, genome.bodyWidth / 2.2))
         };
     }
 }
 
-/* ============================================================
-   9. PIPELINE EXECUTION & FINALIZATION
-   ============================================================ */
-function fitToBounds(ctx, targetW, targetH, padding) {
+function computeRawBounds(ctx) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (let p of ctx.geometry.allBones) {
         if (p.op === 'subtract') continue;
@@ -714,22 +730,51 @@ function fitToBounds(ctx, targetW, targetH, padding) {
         minX = Math.min(minX, b.minX); maxX = Math.max(maxX, b.maxX);
         minY = Math.min(minY, b.minY); maxY = Math.max(maxY, b.maxY);
     }
-    
     for (let e of ctx.geometry.eyePositions) {
         minX = Math.min(minX, e.x - e.radius);
         maxX = Math.max(maxX, e.x + e.radius);
         minY = Math.min(minY, e.y - e.radius);
         maxY = Math.max(maxY, e.y + e.radius);
     }
-    
+    if (minX === Infinity) { minX = minY = 0; maxX = maxY = 1; }
+    return { minX, minY, maxX, maxY };
+}
+
+
+function clampCreatureExtent(ctx, maxAspect = 3.2) {
+    const b = computeRawBounds(ctx);
+    const w = b.maxX - b.minX, h = b.maxY - b.minY;
+    if (w <= 0 || h <= 0) return;
+
+    let axis = null, factor = 1, center = 0;
+    if (w / h > maxAspect) { axis = 'x'; factor = (h * maxAspect) / w; center = (b.minX + b.maxX) / 2; }
+    else if (h / w > maxAspect) { axis = 'y'; factor = (w * maxAspect) / h; center = (b.minY + b.maxY) / 2; }
+    if (!axis) return;
+
+    for (const p of ctx.geometry.allBones) p.squeezeAxis(axis, factor, center);
+    for (const e of ctx.geometry.eyePositions) {
+        if (axis === 'x') e.x = center + (e.x - center) * factor;
+        else e.y = center + (e.y - center) * factor;
+    }
+    if (ctx.geometry.head.headCenter) {
+        const hc = ctx.geometry.head.headCenter;
+        if (axis === 'x') hc.x = center + (hc.x - center) * factor;
+        else hc.y = center + (hc.y - center) * factor;
+    }
+}
+
+function fitToBounds(ctx, targetW, targetH, padding) {
+    clampCreatureExtent(ctx);
+    const { minX, minY, maxX, maxY } = computeRawBounds(ctx);
+
     const w = maxX - minX, h = maxY - minY;
     const scale = Math.min((targetW - padding * 2) / (w || 1), (targetH - padding * 2) / (h || 1));
     const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
     const dx = targetW / 2 - cx * scale, dy = targetH / 2 - cy * scale;
-    
-    for (let p of ctx.geometry.allBones) { p.translate(dx, dy); p.scale(scale); }
+
+    for (let p of ctx.geometry.allBones) { p.scale(scale); p.translate(dx, dy); }
     for (let e of ctx.geometry.eyePositions) { e.x = e.x * scale + dx; e.y = e.y * scale + dy; e.radius *= scale; }
-    
+
     if (ctx.geometry.head.headCenter) {
         ctx.geometry.head.headCenter.x = ctx.geometry.head.headCenter.x * scale + dx;
         ctx.geometry.head.headCenter.y = ctx.geometry.head.headCenter.y * scale + dy;
@@ -753,29 +798,38 @@ function classifyCreature(genome) {
 }
 
 function generateAlien(seed) {
-    // 1. Context Initialization
+
     const ctx = new CreatureContext(seed);
 
-    // 2. Genome Generation, Correlation & Constraints
     ctx.genome = generateGenome(seed);
     ctx.genome = applyCorrelations(ctx.genome, seed);
     ctx.genome = applyConstraints(ctx.genome);
 
-    // 3. Morphology Grammar Execution
     const rng = mulberry32(subSeed(seed, "morphology"));
     const grammar = GrammarRegistry[ctx.genome.bodyPlan] || GrammarRegistry.Vertebrate;
     grammar.execute(ctx, rng);
     
-    // 4. Feature Plugin Generators
-    EyeGenerator.generate(ctx, rng);
+
+    EyeGenerator.generate(ctx);
     MaterialGenerator.generate(ctx);
 
-    // 5. Final Classification
     ctx.facts = classifyCreature(ctx.genome);
 
     return ctx;
 }
 
+
+const AlienEngine = {
+    generate: generateAlien,
+    evaluateField,
+    fitToBounds,
+    noise2D,
+    classifyCreature
+};
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { generateAlien, evaluateField, fitToBounds, noise2D };
+    module.exports = AlienEngine;
+    module.exports.generateAlien = generateAlien;
+} else if (typeof window !== 'undefined') {
+    window.AlienEngine = AlienEngine;
 }
