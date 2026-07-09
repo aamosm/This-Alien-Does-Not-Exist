@@ -428,18 +428,24 @@
     }
 
     function updateInfo(alien, seed) {
+      const g = alien.genome;
+      
+      const build = g.bodyWidth > 1.3 ? 'Robust' : (g.bodyWidth < 0.8 ? 'Slender' : 'Average');
+      const symmetry = g.asymmetry > 0.3 ? 'Asymmetrical' : 'Symmetrical';
+      const spine = g.spineCurve > 0.25 ? 'Arched' : (g.spineCurve < -0.25 ? 'Bowed' : 'Neutral');
+      const vision = g.eyeCount === 0 ? 'Eyeless' : alien.facts.vision;
+      const stance = g.stanceRaw > 0.66 ? 'Wide' : (g.stanceRaw < 0.33 ? 'Narrow' : 'Standard');
+
       document.getElementById("alienData").innerHTML = `
         <span style="color:#fff">Seed:</span> ${displaySeed(seed)}<br><br>
-        <span style="color:#fff">Plan:</span> ${alien.facts.bodyPlan} &nbsp;|&nbsp;
-        <span style="color:#fff">Size:</span> ${alien.facts.size}<br>
-        <span style="color:#fff">Mass:</span> ${Math.round(alien.genome.mass).toLocaleString()} kg<br>
         <span style="color:#fff">Diet:</span> ${alien.facts.diet} &nbsp;|&nbsp;
-        <span style="color:#fff">Mouth:</span> ${alien.genome.mouthType}<br>
-        <span style="color:#fff">Vision:</span> ${alien.facts.vision}<br>
-        <span style="color:#fff">Locomotion:</span> ${alien.facts.locomotion} &nbsp;|&nbsp;
-        <span style="color:#fff">Tail:</span> ${alien.genome.tailLength > 0.15 ? alien.genome.tailType : "None"}<br>
         <span style="color:#fff">Temperament:</span> ${alien.facts.temperament}<br>
-        <span style="color:#fff">Pigment:</span> ${alien.genome.paletteScheme}
+        <span style="color:#fff">Vision:</span> ${vision} &nbsp;|&nbsp;
+        <span style="color:#fff">Locomotion:</span> ${alien.facts.locomotion}<br>
+        <span style="color:#fff">Build:</span> ${build} &nbsp;|&nbsp;
+        <span style="color:#fff">Stance:</span> ${stance}<br>
+        <span style="color:#fff">Spine:</span> ${spine} &nbsp;|&nbsp;
+        <span style="color:#fff">Form:</span> ${symmetry}
       `;
     }
 
