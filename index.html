@@ -53,6 +53,8 @@
       place-items: center;
       position: sticky;
       top: var(--page-pad);
+      padding-top: 5%;
+      padding-bottom: 5%;
     }
 
     canvas {
@@ -117,6 +119,30 @@
       border-bottom: 1px solid var(--border);
       padding-bottom: 4px;
       display: block;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .data-header .chev {
+      display: inline-block;
+      width: 1.2em;
+    }
+
+    .section-body {
+      display: grid;
+      grid-template-rows: 1fr;
+      opacity: 1;
+      transition: grid-template-rows .16s ease, opacity .16s ease;
+    }
+
+    .section-body.collapsed {
+      grid-template-rows: 0fr;
+      opacity: 0;
+    }
+
+    .section-body-inner {
+      overflow: hidden;
+      min-height: 0;
     }
 
     .data-entry {
@@ -174,6 +200,56 @@
       text-align: center;
     }
 
+    .seed-row {
+      display:flex;
+      align-items:center;
+      gap:6px;
+      flex-wrap: wrap;
+    }
+
+    .copy-btn {
+      width: auto;
+      padding: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background:#1d1d1d;
+      color:#fff;
+      cursor:pointer;
+      line-height: 0;
+      transition: background .15s ease, border-color .15s ease, transform .1s ease;
+    }
+
+    .copy-btn:hover {
+      background:#2a2a2a;
+      border-color:#5a5a5a;
+      color:#fff;
+    }
+
+    .copy-btn.copied {
+      color:#000;
+      border-color:#fff;
+      background:#fff;
+    }
+
+    .seed-link {
+      color: #9ec1ff;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .seed-link:hover {
+      color: #c7dbff;
+    }
+
+    .registry-id {
+      user-select: text;
+      -webkit-user-select: text;
+      cursor: text;
+    }
+
     @media (max-width: 980px) {
       .layout {
         grid-template-columns: 1fr;
@@ -213,21 +289,88 @@
 
   <script src="script.js"></script>
   <script src="registry.js"></script>
+  <script src="observations.js"></script>
   <script>
     const BASE_PATH = "";
     const MAX_SEED = 4294967295; 
     const HUMAN_SEED = MAX_SEED + 1; // That Sounds So Wrong
     const SEED_LENGTH = 10;
-    const LOCAL_DB_SIZE = 40;
+    const LOCAL_DB_SIZE = 120;
     
     let localDB = [];
     let dbInitialized = false;
+    let currentRenderedSeed = null;
+    const COLLAPSE_KEY = "taDE.collapsedSections";
 
+    const COPY_ICON = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+    const CHECK_ICON = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+
+    function getCollapsedState() {
+      try {
+        const raw = localStorage.getItem(COLLAPSE_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function setCollapsedState(state) {
+      try {
+        localStorage.setItem(COLLAPSE_KEY, JSON.stringify(state || {}));
+      } catch {}
+    }
+
+    function toggleSection(sectionName) {
+      const state = getCollapsedState();
+      const collapsed = !state[sectionName];
+      state[sectionName] = collapsed;
+      setCollapsedState(state);
+      const header = document.querySelector(`[data-toggle-section="${CSS.escape(sectionName)}"]`);
+      if (!header) return;
+      const chevEl = header.querySelector(".chev");
+      const body = header.nextElementSibling;
+      if (chevEl) chevEl.textContent = collapsed ? "▶" : "▼";
+      if (body) body.classList.toggle("collapsed", collapsed);
+    }
+
+    function resizeCanvasToDisplaySize(canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, Math.round(rect.width * dpr));
+      const height = Math.max(1, Math.round(rect.height * dpr));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+    }
+
+    function smartPadding(alien, canvas) {
+      const b = (alien && alien.geometry && alien.geometry.allBones) ? alien.geometry.allBones : [];
+      if (!b.length) return Math.round(Math.min(canvas.width, canvas.height) * 0.12);
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of b) {
+        if (!p || typeof p.bounds !== "function") continue;
+        const bb = p.bounds();
+        minX = Math.min(minX, bb.minX); minY = Math.min(minY, bb.minY);
+        maxX = Math.max(maxX, bb.maxX); maxY = Math.max(maxY, bb.maxY);
+      }
+      const w = Math.max(1, maxX - minX);
+      const h = Math.max(1, maxY - minY);
+      const aspect = h / w;
+      const base = Math.min(canvas.width, canvas.height);
+      let pct = 0.13;
+      if (aspect > 1.35) pct = 0.16;
+      if (aspect < 0.75) pct = 0.14;
+      return clamp(Math.round(base * pct), 48, 110);
+    }
+
+    function makeSeedLink(seed) {
+      return `<span class="seed-link" data-seed-link="${seed}">${displaySeed(seed)}</span>`;
+    }
 
     function prepareEntity(alien, numSeed) {
         alien.seed = numSeed; 
         
-
         if (!alien.physicalVector) {
             alien.physicalVector = (alien.trace && alien.trace.derived && alien.trace.derived.physicalVector) 
                 ? Array.from(alien.trace.derived.physicalVector) 
@@ -247,17 +390,14 @@
     function initializeLocalDB() {
       if (dbInitialized) return;
       for (let i = 0; i < LOCAL_DB_SIZE; i++) {
-        const s = 100000 + (i * 8887);
+        const s = Math.floor(detHash(0xA11E1, "local-db-" + i) * (MAX_SEED + 1));
         try {
             const alien = AlienEngine.generate(s);
             localDB.push(prepareEntity(alien, s));
-        } catch (e) {
-            
-        }
+        } catch (e) {}
       }
       dbInitialized = true;
     }
-
 
     function detHash(seed, salt) {
       let h = (seed >>> 0);
@@ -309,7 +449,6 @@
     }
 
     function randomSeedString() {
-
       const HUMAN_CHANCE = 1 / 10000;
 
       if (Math.random() < HUMAN_CHANCE) {
@@ -367,20 +506,20 @@
                 bodyLength: 1.5,
                 bodyWidth: 0.5,
                 limbPairsRaw: 0.5,
-                legLengthRaw: 0.8,
-                stanceRaw: 0.2,
-                headSize: 1.2,
+                legLengthRaw: 0.78,
+                stanceRaw: 0.42,
+                headSize: 1.0,
                 headWidth: 1.0,
-                snoutLengthRaw: 0.1,
-                jawDepthRaw: 0.2,
-                chinTaper: 0.4,
+                snoutLengthRaw: 0.08,
+                jawDepthRaw: 0.22,
+                chinTaper: 0.45,
                 headTilt: 0.0,
-                neckLengthRaw: 0.4,
+                neckLengthRaw: 0.34,
                 eyeCount: 2,
                 mouthType: 'Jaw',
                 tailLength: 0.0,
                 tailType: 'None',
-                spineCurve: -0.6, 
+                spineCurve: -0.15, 
                 skinHue: 0.05,
                 skinBrightness: 0.8,
                 skinPattern: 0.1,
@@ -390,21 +529,37 @@
                 accentHueOffset: 0.0,
                 asymmetry: 0.05,
                 asymmetryBias: 1,
-                pupilType: 'round'
+                pupilType: 'round',
+                niche: 'Omnivore',
+                eyePlacement: 'Forward',
+                posture: 'upright',
+                jawDepth: 0.38,
+                snoutLength: 0.22,
+                neckLength: 0.95,
+                neckThickness: 0.92,
+                legLength: 66,
+                legThickness: 9.8,
+                jointRadius: 5.2,
+                socketOutward: 11,
+                limbRootOffset: 4.8,
+                shoulderWidthScale: 1.06,
+                tailBaseThickness: 0,
+                tailSegmentFactor: 0.8
             },
+            eyeClusterStyle: "Horizontal",
             registry: {
-                curiosity: 2.8,
-                watchfulness: 0.1,
-                objectInterest: 2.8,
-                physicalSignature: 0.5
+                curiosity: 2.65,
+                watchfulness: 0.45,
+                objectInterest: 2.35,
+                physicalSignature: 0.4875
             },
             facts: {
                 bodyPlan: "Biped",
                 size: "Medium",
-                diet: "Carnivore",
+                diet: "Omnivore",
                 vision: "Forward Vision",
                 locomotion: "Walking",
-                temperament: "Aggressive"
+                temperament: "Skittish"
             },
             geometry: { allBones: [], eyePositions: [], head: {} },
             materials: {
@@ -420,7 +575,7 @@
                 socketDepth: 0.3, highlightStrength: 0.8, irisPattern: 0.3
             },
             trace: { derived: {
-                physicalVector: [0.5, 0.5, 0.2, 0.5, 0.8, 0.2, 0.8, 0.5, 0.1, 0.2, 0.4, 0.5, 0.4, 0.0, 0.5],
+                physicalVector: [0.29, 0.26, 0.11, 0.50, 0.78, 0.42, 0.38, 0.37, 0.08, 0.22, 0.45, 0.50, 0.34, 0.00, 0.41],
                 physicalKeys: [
                     'genome.mass', 'genome.bodyLength', 'genome.bodyWidth', 'genome.limbPairsRaw',
                     'genome.legLengthRaw', 'genome.stanceRaw', 'genome.headSize', 'genome.headWidth',
@@ -431,6 +586,12 @@
         };
 
         alien.physicalVector = Array.from(alien.trace.derived.physicalVector);
+        if (typeof RegistryEngine !== "undefined" && RegistryEngine.buildBehaviourVector) {
+          alien.behaviourVector = RegistryEngine.buildBehaviourVector(alien);
+        } else {
+          alien.behaviourVector = { keys: ['curiosity','watchfulness','objectInterest'], vector: [alien.registry.curiosity, alien.registry.watchfulness, alien.registry.objectInterest] };
+        }
+
         const h = alien.geometry;
 
         function mkCap(ax, ay, bx, by, r1, r2, op='smooth_add', k=4) {
@@ -511,7 +672,6 @@
 
         return alien;
     }
-
 
     function drawEyes(ctx, eyeGenome, positions, skinColorRGB, eyeColorRGB) {
         if (eyeGenome.eyeCount === 0 || !positions) return;
@@ -607,7 +767,9 @@
     function renderAlien(canvasId, seed) {
       const canvas = document.getElementById(canvasId);
       if (!canvas) return null;
+      resizeCanvasToDisplaySize(canvas);
       const ctx = canvas.getContext("2d");
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const numSeed = parseInt(seed, 10);
@@ -619,7 +781,7 @@
           alien = AlienEngine.generate(numSeed);
       }
 
-      AlienEngine.fitToBounds(alien, canvas.width, canvas.height, 60);
+      AlienEngine.fitToBounds(alien, canvas.width, canvas.height, smartPadding(alien, canvas));
 
       const allBones = alien.geometry.allBones;
       const head = alien.geometry.head;
@@ -741,6 +903,18 @@
         "Similar spine curvature": "Similar posture"
     };
 
+    function sectionBlock(name, innerHtml) {
+      const state = getCollapsedState();
+      const collapsed = !!state[name];
+      const chev = collapsed ? "▶" : "▼";
+      return `
+        <div class="data-section" data-section="${name}">
+          <span class="data-header" data-toggle-section="${name}"><span class="chev">${chev}</span>${name}</span>
+          <div class="section-body${collapsed ? " collapsed" : ""}"><div class="section-body-inner">${innerHtml}</div></div>
+        </div>
+      `;
+    }
+
     function buildDataHTML(alien, seed) {
         const numSeed = parseInt(seed, 10);
         
@@ -769,9 +943,7 @@
                     similarityScore = RegistryEngine.computeSimilarity(alien, closestEntity).overall;
                     rawSharedTraits = RegistryEngine.computeSharedTraits(alien, closestEntity);
                 }
-            } catch (e) {
-               
-            }
+            } catch (e) {}
         }
         
         const mappedTraits = rawSharedTraits.map(t => SharedTraitMap[t] || t);
@@ -794,81 +966,16 @@
             temperament: facts.temperament
         };
 
-        const observations = [
-            // MORPHOLOGY
-            { section: 'MORPHOLOGY', cond: () => g.mass > 30000 && g.stanceRaw > 0.6, cert: 0.9, text: "Motion reconstruction implies high-density skeletal structuring to prevent collapse." },
-            { section: 'MORPHOLOGY', cond: () => g.mass < 8000 && g.legLengthRaw > 0.6, cert: 0.85, text: "Thermal analysis suggests minimal mass, indicating low kinetic resistance during traversal." },
-            { section: 'MORPHOLOGY', cond: () => g.bodyWidth > 1.6 && g.stanceRaw < 0.4, cert: 0.75, text: "Repeated motion reconstruction indicates high lateral stability during rapid directional changes." },
-            { section: 'MORPHOLOGY', cond: () => g.bodyWidth < 0.6, cert: 0.8, text: "Lidar sweeps reveal slender lateral proportions, likely facilitating navigation through dense occlusion." },
-            { section: 'MORPHOLOGY', cond: () => g.stanceRaw > 0.75, cert: 0.85, text: "Wide stance suggests stable movement across irregular topography." },
-            { section: 'MORPHOLOGY', cond: () => g.stanceRaw < 0.25, cert: 0.8, text: "Narrow postural stance reduces substrate footprint; full stability baseline remains unconfirmed." },
-            { section: 'MORPHOLOGY', cond: () => g.tailLength > 2.5 && g.mass > 15000, cert: 0.8, text: "Motion reconstruction predicts the elongated caudal appendage functions as a kinetic counterbalance." },
-            { section: 'MORPHOLOGY', cond: () => g.spineCurve > 0.5, cert: 0.7, text: "Dorsal curvature inherently lowers the center of gravity; classification remains provisional." },
-            { section: 'MORPHOLOGY', cond: () => g.spineCurve < -0.5 && states.locomotion === 'Walking', cert: 0.75, text: "Ventral spinal bowing implies tension-based kinetic energy storage for sudden acceleration." },
-            { section: 'MORPHOLOGY', cond: () => g.asymmetry > 0.6, cert: 0.9, text: "Optical locks repeatedly fail due to highly asymmetrical silhouette." },
-            { section: 'MORPHOLOGY', cond: () => g.asymmetry < 0.15, cert: 0.85, text: "Passive sensor arrays record near-perfect bilateral symmetry, implying stable developmental conditions." },
-            { section: 'MORPHOLOGY', cond: () => g.eyeCount === 0, cert: 0.95, text: "Optical sensors appear absent; probabilistic models assume non-visual mapping modalities." },
-            { section: 'MORPHOLOGY', cond: () => g.eyeCount === 1, cert: 0.85, text: "Singular optic structure detected, suggesting reliance on ambient light gathering over binocular depth estimation." },
-            { section: 'MORPHOLOGY', cond: () => g.bodyPlan === 'Serpentine', cert: 0.95, text: "Seismic monitoring confirms continuous substrate contact; axial mass distribution observed." },
-            { section: 'MORPHOLOGY', cond: () => (g.bodyPlan === 'Radial' || g.bodyPlan === 'Cephalopod'), cert: 0.9, text: "Radial appendage distribution permits omnidirectional traversal without reorienting core mass." },
-            { section: 'MORPHOLOGY', cond: () => g.snoutLengthRaw > 0.7 && states.diet === 'Carnivore', cert: 0.85, text: "Extended anterior structure supports deep probing into concealed thermal pockets." },
-            { section: 'MORPHOLOGY', cond: () => g.limbPairsRaw > 0.6, cert: 0.9, text: "Multi-limb configuration suggests significant redundancy during complex terrain traversal." },
-            { section: 'MORPHOLOGY', cond: () => g.jawDepthRaw > 0.7, cert: 0.8, text: "Pronounced mandibular depth implies biomechanical adaptations for high-force material processing." },
-            { section: 'MORPHOLOGY', cond: () => g.jawDepthRaw < 0.3, cert: 0.75, text: "Shallow mandibular structure suggests consumption restricted to easily processed localized matter." },
-            { section: 'MORPHOLOGY', cond: () => g.chinTaper > 0.8, cert: 0.7, text: "Sharp cranial tapering improves dynamic efficiency during rapid environmental traversal." },
-            { section: 'MORPHOLOGY', cond: () => g.neckLengthRaw > 0.7 && g.headSize > 1.0, cert: 0.85, text: "Elongated cervical structure effectively isolates the primary sensory cluster from the main thermal mass." },
-            { section: 'MORPHOLOGY', cond: () => g.neckLengthRaw < 0.2, cert: 0.8, text: "Truncated cervical development restricts independent cranial rotation; full body pivoting required." },
-            { section: 'MORPHOLOGY', cond: () => g.headTilt > 0.2, cert: 0.75, text: "Upward cranial articulation implies persistent monitoring of aerial or elevated thermal signatures." },
-            { section: 'MORPHOLOGY', cond: () => g.headTilt < -0.2, cert: 0.75, text: "Downward cranial articulation suggests primary focus on substrate-level resources or seismic activity." },
-            
-            // BEHAVIOUR
-            { section: 'BEHAVIOUR', cond: () => states.explorationDrive > 0.75 && states.caution < 0.3, cert: states.explorationDrive * (1 - states.caution), text: "Repeated remote observations indicate unhesitating approaches toward automated monitoring stations." },
-            { section: 'BEHAVIOUR', cond: () => states.explorationDrive > 0.75 && states.caution > 0.7, cert: states.explorationDrive * states.caution, text: "Orbital telemetry suggests prolonged inspection of unfamiliar structures before immediate withdrawal." },
-            { section: 'BEHAVIOUR', cond: () => states.explorationDrive < 0.25, cert: 1 - states.explorationDrive, text: "Thermal mapping indicates prolonged stagnation within narrow geographical parameters." },
-            { section: 'BEHAVIOUR', cond: () => states.fixation > 0.75, cert: states.fixation, text: "Long-term automated monitoring recorded extensive time dedicated to examining localized anomalies." },
-            { section: 'BEHAVIOUR', cond: () => states.volatility > 0.7, cert: states.volatility, text: "Probabilistic models fail to predict movement patterns; entity displays extreme navigational variance." },
-            { section: 'BEHAVIOUR', cond: () => states.volatility < 0.2, cert: 1 - states.volatility, text: "Motion vectors remain highly consistent across multiple orbital sweeps." },
-            { section: 'BEHAVIOUR', cond: () => states.boldness > 0.8 && states.temperament === 'Aggressive', cert: states.boldness, text: "Postural displays aggressively challenge automated vehicles encroaching on its immediate perimeter." },
-            { section: 'BEHAVIOUR', cond: () => states.boldness < 0.2 && states.temperament === 'Skittish', cert: 1 - states.boldness, text: "Primary response to atmospheric disturbance involves immediate, rapid relocation to dense cover." },
-            { section: 'BEHAVIOUR', cond: () => states.caution > 0.8, cert: states.caution, text: "Passive sensor arrays consistently lose optical lock due to the entity's rapid evasion behaviors." },
-            { section: 'BEHAVIOUR', cond: () => states.fixation > 0.8 && states.diet === 'Herbivore', cert: states.fixation, text: "Demonstrates prolonged focus on specific organic structures beyond standard biological necessities." },
-            { section: 'BEHAVIOUR', cond: () => g.eyeCount === 0 && states.caution > 0.7, cert: states.caution, text: "Reacts instantly to micro-seismic shifts, compensating for the lack of visual telemetry." },
-            { section: 'BEHAVIOUR', cond: () => nCur > 0.8 && g.mass > 25000, cert: nCur, text: "Investigation tactics are forceful, frequently resulting in the unintentional disruption of sensor equipment." },
-            { section: 'BEHAVIOUR', cond: () => nCur > 0.8 && g.mass < 8000, cert: nCur, text: "Utilizes highly precise, low-impact movements when investigating deployed monitoring hardware." },
-            
-            // ECOLOGY
-            { section: 'ECOLOGY', cond: () => states.diet === 'Carnivore' && states.temperament === 'Aggressive', cert: 0.9, text: "Spectroscopy and thermal tracking suggest active pursuit and exhaustion of local biomass." },
-            { section: 'ECOLOGY', cond: () => states.diet === 'Carnivore' && states.temperament === 'Skittish', cert: 0.8, text: "Probabilistic models suggest reliance on ambush tactics or passive scavenging to avoid direct confrontation." },
-            { section: 'ECOLOGY', cond: () => states.diet === 'Herbivore' && states.environmentalAttachment > 0.7, cert: states.environmentalAttachment, text: "Long-term automated monitoring indicates localized foraging restricted to specific environmental zones." },
-            { section: 'ECOLOGY', cond: () => states.diet === 'Herbivore' && states.environmentalAttachment < 0.3, cert: 1 - states.environmentalAttachment, text: "Demonstrates nomadic resource gathering, rarely depleting a single geographical area before migrating." },
-            { section: 'ECOLOGY', cond: () => states.diet === 'Filter Feeder', cert: 0.95, text: "Atmospheric disturbance readings imply passive particulate absorption as a primary energy source." },
-            { section: 'ECOLOGY', cond: () => states.environmentalAttachment > 0.8, cert: states.environmentalAttachment, text: "Shows extreme reluctance to migrate; biological signatures remain tethered to specific structural anchors." },
-            { section: 'ECOLOGY', cond: () => states.environmentalAttachment < 0.2, cert: 1 - states.environmentalAttachment, text: "Cross-correlation of archived scans reveals a highly transient, non-anchored trajectory." },
-            { section: 'ECOLOGY', cond: () => states.locomotion === 'Slithering', cert: 0.9, text: "Motion reconstruction predicts exceptionally high efficiency on uneven substrates." },
-            { section: 'ECOLOGY', cond: () => states.locomotion === 'Walking' && g.mass > 20000, cert: (g.mass - 20000) / 30000, text: "Pedal locomotion creates significant micro-seismic disturbances, easily detectable by remote arrays." },
-            { section: 'ECOLOGY', cond: () => g.bodyPlan === 'Tripod', cert: 0.85, text: "Tri-lateral ground contact provides unique static stability on severely inclined geological formations." },
-            { section: 'ECOLOGY', cond: () => g.legLengthRaw > 0.7, cert: (g.legLengthRaw - 0.7) / 0.3, text: "Extended limb proportions elevate the primary core above local ground-level obstructions." },
-            { section: 'ECOLOGY', cond: () => g.legLengthRaw < 0.3, cert: (0.3 - g.legLengthRaw) / 0.3, text: "Shortened limb proportions keep the core thermal mass insulated against extreme substrate temperatures." },
+        const observations = (typeof ObservationEngine !== "undefined" && ObservationEngine.getPool)
+          ? ObservationEngine.getPool(alien, states, null)
+          : [];
 
-            // OBSERVATIONS
-            { section: 'OBSERVATIONS', cond: () => true, cert: 0.6, text: "Classification remains provisional due to incomplete surface penetration by remote sensors." },
-            { section: 'OBSERVATIONS', cond: () => true, cert: 0.5, text: "Thermal analysis suggests localized metabolic variations during high-speed traversal." },
-            { section: 'OBSERVATIONS', cond: () => true, cert: 0.7, text: "Repeated orbital passes indicate entity deliberately avoids zones of high seismic activity." },
-            { section: 'OBSERVATIONS', cond: () => true, cert: 0.75, text: "Long-range spectroscopy indicates surface compounds that periodically disrupt standard optical targeting." },
-            { section: 'OBSERVATIONS', cond: () => true, cert: 0.45, text: "Remote monitoring reveals periodic, low-energy stasis phases unaligned with local cycles." },
-            { section: 'OBSERVATIONS', cond: () => states.caution > 0.8 && states.explorationDrive < 0.3, cert: states.caution, text: "Observation windows are typically brief due to the target's rapid evasion protocols upon sensor detection." },
-            { section: 'OBSERVATIONS', cond: () => states.explorationDrive > 0.8 && states.caution < 0.3, cert: states.explorationDrive, text: "Entity's lack of evasion has allowed for unusually extensive, high-fidelity structural scans." },
-            { section: 'OBSERVATIONS', cond: () => states.temperament === 'Aggressive' && states.size === 'Massive', cert: 0.95, text: "Automated threat-assessment algorithms flag significant kinetic danger to deployed surface hardware." },
-            { section: 'OBSERVATIONS', cond: () => states.temperament === 'Skittish' && states.size === 'Small', cert: 0.9, text: "Extensive passive camouflage and thermal masking frequently result in premature loss of optical lock." },
-            { section: 'OBSERVATIONS', cond: () => states.volatility > 0.7, cert: states.volatility, text: "Classification confidence remains low due to highly erratic threat-assessment responses." },
-            { section: 'OBSERVATIONS', cond: () => Math.abs(g.spineCurve) > 0.4 && g.asymmetry > 0.6, cert: g.asymmetry, text: "Initial orbital reports frequently misclassified this signature due to highly irregular postural geometry." },
-            { section: 'OBSERVATIONS', cond: () => g.mass > 30000 && states.locomotion === 'Walking', cert: (g.mass - 30000) / 20000, text: "Remote telemetry consistently documents rapid kinetic exhaustion, likely due to massive metabolic constraints." },
-            { section: 'OBSERVATIONS', cond: () => states.diet === 'Carnivore' && states.size === 'Small', cert: 0.85, text: "Archived records indicate this signature was initially classified as a scavenger until active predation was confirmed." },
-            { section: 'OBSERVATIONS', cond: () => nInt > 0.7 && states.caution < 0.5, cert: nInt, text: "Entity frequently triggers automated proximity sensors during localized investigative routines." },
-            { section: 'OBSERVATIONS', cond: () => g.stanceRaw > 0.7, cert: (g.stanceRaw - 0.7) / 0.3, text: "Wide stance leaves broad, easily trackable impressions detectable by low-orbit topological sweeps." },
-            { section: 'OBSERVATIONS', cond: () => g.asymmetry > 0.7, cert: (g.asymmetry - 0.7) / 0.3, text: "Observation systems frequently lose tracking locks when the entity utilizes its highly asymmetric profile in dense occlusion." },
-            { section: 'OBSERVATIONS', cond: () => states.diet === 'Carnivore' && states.temperament === 'Skittish', cert: 0.8, text: "Archived telemetry initially suggested a detritivore classification until prolonged thermal monitoring revealed ambush behaviors." }
-        ];
+        if (typeof RegistryEngine !== "undefined" && RegistryEngine.summarizeMorphologyObservations) {
+          try {
+            const extra = RegistryEngine.summarizeMorphologyObservations(alien) || [];
+            extra.forEach((t, i) => observations.push({ section: 'MORPHOLOGY', cond: () => true, cert: 0.82 - i * 0.06, text: t }));
+          } catch {}
+        }
 
         const validObs = observations.filter(o => o.cond());
 
@@ -879,57 +986,78 @@
             'OBSERVATIONS': selectN(seed, "obs", validObs.filter(o => o.section === 'OBSERVATIONS'), 4 + Math.floor(detHash(seed, "oC") * 2))
         };
 
-    
         let html = '';
 
-        // IDENTITY
-        html += `
-          <div class="data-section">
-            <span class="data-header">// IDENTITY</span>
-            <div class="data-entry"><span class="entry-label">Entity Seed:</span> ${displaySeed(numSeed)}</div>
-            <div class="data-entry"><span class="entry-label">Registry ID:</span> ${numSeed === HUMAN_SEED ? 'REG-H0M0S4P' : fingerprint}</div>
-          </div>
-        `;
+        let distinguishing = "";
+        if (typeof ObservationEngine !== "undefined" && ObservationEngine.getDistinguishing) {
+          try { distinguishing = ObservationEngine.getDistinguishing(alien) || ""; } catch {}
+        }
 
-      
+        const identityInner = `
+          <div class="data-entry seed-row">
+            <span class="entry-label">Entity Seed:</span> <span id="seedValue">${displaySeed(numSeed)}</span>
+            <button class="copy-btn" id="copySeedBtn" type="button" aria-label="Copy seed">${COPY_ICON}</button>
+          </div>
+          <div class="data-entry"><span class="entry-label">Registry ID:</span> <span class="registry-id">${numSeed === HUMAN_SEED ? 'REG-H0M0S4P' : fingerprint}</span></div>
+          ${distinguishing ? `<div class="data-entry"><span class="entry-label">Distinguishing Trait:</span> ${distinguishing}</div>` : ""}
+        `;
+        html += sectionBlock("IDENTITY", identityInner);
+
         const renderOrder = ['MORPHOLOGY', 'BEHAVIOUR', 'ECOLOGY', 'OBSERVATIONS'];
         renderOrder.forEach(sec => {
             if (selections[sec] && selections[sec].length > 0) {
-                html += `<div class="data-section"><span class="data-header">// ${sec}</span>`;
-                selections[sec].forEach((item) => {
+                const inner = selections[sec].map(item => {
                     const conf = getConf(item.cert);
-                    html += `<div class="data-entry"><span class="entry-confidence">${conf}</span> ${item.text}</div>`;
-                });
-                html += `</div>`;
+                    return `<div class="data-entry"><span class="entry-confidence">${conf}</span> ${item.text}</div>`;
+                }).join("");
+                html += sectionBlock(sec, inner);
             }
         });
 
-        // SIMILAR ENTITY
         let sharedText = uniqueTraits.length > 0 
             ? uniqueTraits.map(t => `<br>&nbsp;&nbsp;• ${t}`).join('') 
             : "<br>&nbsp;&nbsp;• Insufficient baseline overlap";
 
         if (closestSeedNum !== null) {
             const simPct = (similarityScore * 100).toFixed(1);
-            html += `
-              <div class="data-section">
-                <span class="data-header">// SIMILAR ENTITY</span>
-                <div class="data-entry"><span class="entry-label">Entity Seed:</span> ${displaySeed(closestSeedNum)}</div>
-                <div class="data-entry"><span class="entry-label">Registry ID:</span> ${closestFingerprint}</div>
+            const similarInner = `
+                <div class="data-entry"><span class="entry-label">Entity Seed:</span> ${makeSeedLink(closestSeedNum)}</div>
+                <div class="data-entry"><span class="entry-label">Registry ID:</span> <span class="registry-id">${closestFingerprint}</span></div>
                 <div class="data-entry"><span class="entry-label">Estimated Similarity:</span> ${simPct}%</div>
                 <div class="data-entry"><span class="entry-label">Shared Traits:</span>${sharedText}</div>
-              </div>
             `;
+            html += sectionBlock("LOCAL ANALYSIS", similarInner);
         } else {
-            html += `
-              <div class="data-section">
-                <span class="data-header">// SIMILAR ENTITY</span>
-                <div class="data-entry"><span class="entry-label">Status:</span> Search unavailable or local cache empty.</div>
-              </div>
-            `;
+            html += sectionBlock("LOCAL ANALYSIS", `<div class="data-entry"><span class="entry-label">Status:</span> Search unavailable or local cache empty.</div>`);
         }
 
         document.getElementById("alienData").innerHTML = html;
+
+        const copyBtn = document.getElementById("copySeedBtn");
+        if (copyBtn) {
+          copyBtn.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(displaySeed(numSeed));
+              copyBtn.innerHTML = CHECK_ICON;
+              copyBtn.classList.add("copied");
+              setTimeout(() => {
+                copyBtn.innerHTML = COPY_ICON;
+                copyBtn.classList.remove("copied");
+              }, 1000);
+            } catch {}
+          });
+        }
+
+        document.querySelectorAll("[data-toggle-section]").forEach(el => {
+          el.addEventListener("click", () => toggleSection(el.getAttribute("data-toggle-section")));
+        });
+
+        document.querySelectorAll("[data-seed-link]").forEach(el => {
+          el.addEventListener("click", () => {
+            const s = el.getAttribute("data-seed-link");
+            if (s != null) newAlien("url", s);
+          });
+        });
     }
 
     function newAlien(mode = "input", urlSeed = null) {
@@ -937,7 +1065,7 @@
       const input = document.getElementById("seedInput");
       dataEl.textContent = "Interfacing with telemetry archive...";
 
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         let seed = null;
 
         if (urlSeed != null) seed = normalizeSeedString(urlSeed);
@@ -949,21 +1077,33 @@
         const push = mode === "random";
         updateURL(seed, push);
 
+        currentRenderedSeed = seed;
         const alien = renderAlien("alienCanvas", seed);
         buildDataHTML(alien, seed);
-      }, 20);
+      });
     }
 
     window.addEventListener("load", () => {
-      const seedFromUrl =
-        extractSeedFromPath(window.location.pathname) ||
-        getSeedFromRedirectParam();
+      requestAnimationFrame(() => {
+        const seedFromUrl =
+          extractSeedFromPath(window.location.pathname) ||
+          getSeedFromRedirectParam();
 
-      if (seedFromUrl) {
-      newAlien("url", seedFromUrl);
-      history.replaceState({ seed: seedFromUrl }, "", "/" + displaySeed(seedFromUrl));
-      } else {
-        newAlien("random");
+        if (seedFromUrl) {
+          newAlien("url", seedFromUrl);
+          history.replaceState({ seed: seedFromUrl }, "", "/" + displaySeed(seedFromUrl));
+        } else {
+          newAlien("random");
+        }
+      });
+    });
+
+    window.addEventListener("resize", () => {
+      if (currentRenderedSeed != null) {
+        requestAnimationFrame(() => {
+          const alien = renderAlien("alienCanvas", currentRenderedSeed);
+          buildDataHTML(alien, currentRenderedSeed);
+        });
       }
     });
 
