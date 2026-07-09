@@ -36,6 +36,24 @@ function weightedChoice(rng, choices) {
     return choices[choices.length - 1][1];
 }
 
+/* ============================================================
+   DETERMINISTIC TRACE RECORDER
+   ============================================================ */
+function makeTracedRng(rawRng, trace) {
+    return function (label) {
+        const v = rawRng();
+        const idx = trace.values.length;
+        trace.values.push(v);
+        if (label) trace.labels[label] = idx;
+        return v;
+    };
+}
+
+function traceGet(trace, label) {
+    const idx = trace.labels[label];
+    return idx === undefined ? 0 : trace.values[idx];
+}
+
 function hash21(x, y) {
     let n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
     return n - Math.floor(n);
@@ -184,6 +202,9 @@ class CreatureContext {
         this.eyes = {};
         this.facts = {};
         this.featureData = {};
+
+        this.trace = { values: [], labels: {}, derived: {} };
+        this.registry = {};
     }
 
     registerSocket(name, x, y, dirX = 0, dirY = 1, radius = 0) {
@@ -208,49 +229,52 @@ class CreatureContext {
 /* ============================================================
    GENOME GENERATION & CONSTRAINT SOLVERS
    ============================================================ */
-function generateGenome(seed) {
-    const rng = mulberry32(subSeed(seed, "genome"));
-    const skew = (p) => Math.pow(rng(), p);
+function generateGenome(seed, trace) {
+    const rawRng = mulberry32(subSeed(seed, "genome"));
+    const rng = makeTracedRng(rawRng, trace);
+    const skew = (p, label) => Math.pow(rng(label), p);
 
-    return {
-        mass: lerp(500, 50000, skew(2.2)),
-        bodyPlan: weightedChoice(rng, [
-            [0.25, "Quadruped"], [0.20, "Biped"], [0.15, "Serpentine"],
-            [0.15, "Insectoid"], [0.10, "Arachnoid"], [0.05, "Tripod"],
-            [0.05, "Cephalopod"], [0.05, "Radial"], [0.05, "Winged"]
-        ]),
-        bodyLength: lerp(0.8, 3.5, rng()),
-        bodyWidth: lerp(0.3, 2.2, rng()),
-        limbPairsRaw: rng(),
-        legLengthRaw: skew(1.5),
-        stanceRaw: rng(),
-        headSize: lerp(0.4, 2.0, rng()),
-        headWidth: lerp(0.4, 2.0, rng()),
-        snoutLengthRaw: skew(1.5),
-        jawDepthRaw: rng(),
-        chinTaper: lerp(0.2, 1.2, rng()),
-        headTilt: lerp(-0.4, 0.4, rng()),
-        neckLengthRaw: skew(1.6),
-        eyeCount: weightedChoice(rng, [[0.07, 0], [0.10, 1], [0.83, 2]]),
-        mouthType: weightedChoice(rng, [[0.3, "Jaw"], [0.25, "Mandibles"], [0.2, "Beak"], [0.15, "Proboscis"], [0.1, "Filter"]]),
-        tailLength: lerp(0, 4.0, skew(1.4)),
-        tailType: weightedChoice(rng, [[0.5, "Whip"], [0.2, "Club"], [0.2, "Paddle"], [0.1, "Forked"]]),
-        spineCurve: lerp(-0.8, 0.8, rng()),
-        skinHue: rng(),
-        skinBrightness: rng(),
-        skinPattern: rng(),
-        patternStyle: rng(),
-        patternContrast: lerp(0.25, 0.85, rng()),
-        paletteScheme: weightedChoice(rng, [[0.3, "complementary"], [0.3, "analogous"], [0.25, "triadic"], [0.15, "monochrome"]]),
-        accentHueOffset: rng(),
-        asymmetry: Math.pow(rng(), 2.5),
-        asymmetryBias: rng() < 0.5 ? -1 : 1
-    };
+    const genome = {};
+    genome.mass = lerp(500, 50000, skew(2.2, 'genome.mass'));
+    genome.bodyPlan = weightedChoice(() => rng('genome.bodyPlan'), [
+        [0.25, "Quadruped"], [0.20, "Biped"], [0.15, "Serpentine"],
+        [0.15, "Insectoid"], [0.10, "Arachnoid"], [0.05, "Tripod"],
+        [0.05, "Cephalopod"], [0.05, "Radial"], [0.05, "Winged"]
+    ]);
+    genome.bodyLength = lerp(0.8, 3.5, rng('genome.bodyLength'));
+    genome.bodyWidth = lerp(0.3, 2.2, rng('genome.bodyWidth'));
+    genome.limbPairsRaw = rng('genome.limbPairsRaw');
+    genome.legLengthRaw = skew(1.5, 'genome.legLengthRaw');
+    genome.stanceRaw = rng('genome.stanceRaw');
+    genome.headSize = lerp(0.4, 2.0, rng('genome.headSize'));
+    genome.headWidth = lerp(0.4, 2.0, rng('genome.headWidth'));
+    genome.snoutLengthRaw = skew(1.5, 'genome.snoutLengthRaw');
+    genome.jawDepthRaw = rng('genome.jawDepthRaw');
+    genome.chinTaper = lerp(0.2, 1.2, rng('genome.chinTaper'));
+    genome.headTilt = lerp(-0.4, 0.4, rng('genome.headTilt'));
+    genome.neckLengthRaw = skew(1.6, 'genome.neckLengthRaw');
+    genome.eyeCount = weightedChoice(() => rng('genome.eyeCount'), [[0.07, 0], [0.10, 1], [0.83, 2]]);
+    genome.mouthType = weightedChoice(() => rng('genome.mouthType'), [[0.3, "Jaw"], [0.25, "Mandibles"], [0.2, "Beak"], [0.15, "Proboscis"], [0.1, "Filter"]]);
+    genome.tailLength = lerp(0, 4.0, skew(1.4, 'genome.tailLength'));
+    genome.tailType = weightedChoice(() => rng('genome.tailType'), [[0.5, "Whip"], [0.2, "Club"], [0.2, "Paddle"], [0.1, "Forked"]]);
+    genome.spineCurve = lerp(-0.8, 0.8, rng('genome.spineCurve'));
+    genome.skinHue = rng('genome.skinHue');
+    genome.skinBrightness = rng('genome.skinBrightness');
+    genome.skinPattern = rng('genome.skinPattern');
+    genome.patternStyle = rng('genome.patternStyle');
+    genome.patternContrast = lerp(0.25, 0.85, rng('genome.patternContrast'));
+    genome.paletteScheme = weightedChoice(() => rng('genome.paletteScheme'), [[0.3, "complementary"], [0.3, "analogous"], [0.25, "triadic"], [0.15, "monochrome"]]);
+    genome.accentHueOffset = rng('genome.accentHueOffset');
+    genome.asymmetry = Math.pow(rng('genome.asymmetry'), 2.5);
+    genome.asymmetryBias = rng('genome.asymmetryBias') < 0.5 ? -1 : 1;
+
+    return genome;
 }
 
-function applyCorrelations(genome, seed) {
-    const rng = mulberry32(subSeed(seed, "ecology"));
-    genome.niche = weightedChoice(rng, [[0.45, "Predator"], [0.40, "Prey"], [0.15, "FilterFeeder"]]);
+function applyCorrelations(genome, seed, trace) {
+    const rawRng = mulberry32(subSeed(seed, "ecology"));
+    const rng = makeTracedRng(rawRng, trace);
+    genome.niche = weightedChoice(() => rng('ecology.niche'), [[0.45, "Predator"], [0.40, "Prey"], [0.15, "FilterFeeder"]]);
 
     if (genome.niche === "Predator") {
         genome.jawDepthRaw = lerp(genome.jawDepthRaw, 1.0, 0.6); 
@@ -300,7 +324,19 @@ class CreatureModule {
     constructor(ctx, rng) {
         this.ctx = ctx;
         this.genome = ctx.genome;
-        this.rng = rng;
+
+        const trace = ctx.trace;
+        const className = this.constructor.name;
+        const instanceId = (ctx._moduleInstanceCounter = (ctx._moduleInstanceCounter || 0) + 1);
+        let drawCount = 0;
+        this.rng = () => {
+            const v = rng();
+            const idx = trace.values.length;
+            trace.values.push(v);
+            trace.labels[`morphology.${className}#${instanceId}.draw${drawCount++}`] = idx;
+            return v;
+        };
+
         this.primitives = [];
         this.worldX = 0; 
         this.worldY = 0;
@@ -797,12 +833,53 @@ function classifyCreature(genome) {
     };
 }
 
+/* ============================================================
+   DERIVED REGISTRY
+   ============================================================ */
+function buildDerivedRegistry(ctx) {
+    const t = ctx.trace;
+    const g = (label) => traceGet(t, label);
+
+    const curiosity = g('genome.stanceRaw') + g('genome.headTilt') + g('genome.accentHueOffset');
+    const watchfulness = g('genome.jawDepthRaw') + g('genome.chinTaper');
+    const objectInterest = g('genome.patternContrast') + g('genome.asymmetry') + g('genome.neckLengthRaw');
+
+    t.derived.curiosity = curiosity;
+    t.derived.watchfulness = watchfulness;
+    t.derived.objectInterest = objectInterest;
+
+    const physicalKeys = [
+        'genome.mass', 'genome.bodyLength', 'genome.bodyWidth', 'genome.limbPairsRaw',
+        'genome.legLengthRaw', 'genome.stanceRaw', 'genome.headSize', 'genome.headWidth',
+        'genome.snoutLengthRaw', 'genome.jawDepthRaw', 'genome.chinTaper', 'genome.headTilt',
+        'genome.neckLengthRaw', 'genome.tailLength', 'genome.spineCurve'
+    ];
+    const physicalVector = physicalKeys.map(g);
+
+    // Weighted average of the raw 0..1 draws behind every physical feature.
+    // Weights are just each component's fixed position (+1) so the formula
+    let weightedSum = 0, weightTotal = 0;
+    physicalVector.forEach((v, i) => { const w = i + 1; weightedSum += v * w; weightTotal += w; });
+    const physicalSignature = weightedSum / weightTotal;
+
+    t.derived.physicalKeys = physicalKeys;
+    t.derived.physicalVector = physicalVector;
+    t.derived.physicalSignature = physicalSignature;
+
+    ctx.registry = {
+        curiosity: Number(curiosity.toFixed(4)),
+        watchfulness: Number(watchfulness.toFixed(4)),
+        objectInterest: Number(objectInterest.toFixed(4)),
+        physicalSignature: Number(physicalSignature.toFixed(6))
+    };
+}
+
 function generateAlien(seed) {
 
     const ctx = new CreatureContext(seed);
 
-    ctx.genome = generateGenome(seed);
-    ctx.genome = applyCorrelations(ctx.genome, seed);
+    ctx.genome = generateGenome(seed, ctx.trace);
+    ctx.genome = applyCorrelations(ctx.genome, seed, ctx.trace);
     ctx.genome = applyConstraints(ctx.genome);
 
     const rng = mulberry32(subSeed(seed, "morphology"));
@@ -814,6 +891,7 @@ function generateAlien(seed) {
     MaterialGenerator.generate(ctx);
 
     ctx.facts = classifyCreature(ctx.genome);
+    buildDerivedRegistry(ctx);
 
     return ctx;
 }
@@ -824,7 +902,8 @@ const AlienEngine = {
     evaluateField,
     fitToBounds,
     noise2D,
-    classifyCreature
+    classifyCreature,
+    traceGet
 };
 
 if (typeof module !== 'undefined' && module.exports) {

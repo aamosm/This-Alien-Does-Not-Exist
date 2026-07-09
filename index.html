@@ -18,7 +18,7 @@
 
       --page-pad: clamp(12px, 2.4vw, 28px);
       --col-gap: clamp(18px, 3vw, 44px);
-      --panel-w: clamp(250px, 28vw, 340px);
+      --panel-w: clamp(250px, 28vw, 360px);
       --radius: 12px;
     }
 
@@ -44,13 +44,15 @@
       display: grid;
       grid-template-columns: minmax(320px, 1fr) var(--panel-w);
       gap: var(--col-gap);
-      align-items: center;
+      align-items: flex-start;
     }
 
     .canvas-wrap {
       width: 100%;
       display: grid;
       place-items: center;
+      position: sticky;
+      top: var(--page-pad);
     }
 
     canvas {
@@ -80,22 +82,63 @@
       flex-direction: column;
       gap: 14px;
       align-self: stretch;
-      justify-content: space-between;
       min-height: min(78svh, 820px);
     }
 
     #alienData {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 13px;
-      line-height: 1.55;
+      font-size: 12px;
+      line-height: 1.6;
       color: var(--text);
       word-break: break-word;
+      flex-grow: 1;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+    
+    #alienData::-webkit-scrollbar {
+      width: 6px;
+    }
+    #alienData::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    .data-section {
+      margin-bottom: 16px;
+    }
+    
+    .data-header {
+      color: #fff;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+      display: block;
+    }
+
+    .data-entry {
+      margin-bottom: 10px;
+    }
+    
+    .entry-label {
+      color: #ddd;
+    }
+
+    .entry-confidence {
+      color: var(--muted);
+      margin-right: 4px;
     }
 
     .controls {
       display: flex;
       flex-direction: column;
       gap: 10px;
+      margin-top: 10px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
     }
 
     input, button {
@@ -128,12 +171,16 @@
     .hint {
       font-size: 12px;
       color: var(--muted);
+      text-align: center;
     }
 
     @media (max-width: 980px) {
       .layout {
         grid-template-columns: 1fr;
         gap: 16px;
+      }
+      .canvas-wrap {
+        position: static;
       }
       canvas {
         width: min(100%, 82vw);
@@ -149,32 +196,111 @@
   <main class="page">
     <section class="layout">
       <div class="canvas-wrap">
-        <canvas id="alienCanvas" width="700" height="700" title="Click to generate random"></canvas>
+        <canvas id="alienCanvas" width="700" height="700" title="Click to load another entity"></canvas>
       </div>
 
       <aside class="panel">
-        <div id="alienData">Loading Aliens</div>
+        <div id="alienData">Accessing telemetry...</div>
 
         <div class="controls">
           <input type="text" id="seedInput" placeholder="Custom Seed..." inputmode="numeric" />
           <button id="generateBtn">Load</button>
-          <div class="hint">Tip: click the alien to go to a random one</div>
+          <div class="hint">Click the entity to discover another.</div>
         </div>
       </aside>
     </section>
   </main>
 
   <script src="script.js"></script>
+  <script src="registry.js"></script>
   <script>
     const BASE_PATH = "";
-    const SEED_LENGTH = 10;
     const MAX_SEED = 4294967295; 
+    const HUMAN_SEED = MAX_SEED + 1; // That Sounds So Wrong
+    const SEED_LENGTH = 10;
+    const LOCAL_DB_SIZE = 40;
+    
+    let localDB = [];
+    let dbInitialized = false;
 
+
+    function prepareEntity(alien, numSeed) {
+        alien.seed = numSeed; 
+        
+
+        if (!alien.physicalVector) {
+            alien.physicalVector = (alien.trace && alien.trace.derived && alien.trace.derived.physicalVector) 
+                ? Array.from(alien.trace.derived.physicalVector) 
+                : new Array(15).fill(0);
+        }
+        
+        if (!alien.behaviourVector && typeof RegistryEngine !== 'undefined') {
+            try {
+                alien.behaviourVector = RegistryEngine.buildBehaviourVector(alien);
+            } catch (e) {
+                alien.behaviourVector = { keys: [], vector: [] };
+            }
+        }
+        return alien;
+    }
+
+    function initializeLocalDB() {
+      if (dbInitialized) return;
+      for (let i = 0; i < LOCAL_DB_SIZE; i++) {
+        const s = 100000 + (i * 8887);
+        try {
+            const alien = AlienEngine.generate(s);
+            localDB.push(prepareEntity(alien, s));
+        } catch (e) {
+            
+        }
+      }
+      dbInitialized = true;
+    }
+
+
+    function detHash(seed, salt) {
+      let h = (seed >>> 0);
+      for(let i = 0; i < salt.length; i++) {
+        h = Math.imul(h ^ salt.charCodeAt(i), 2654435761) >>> 0;
+      }
+      return (h >>> 0) / 4294967296;
+    }
+
+    function pickDet(seed, salt, array) {
+      if (!array || array.length === 0) return null;
+      const idx = Math.floor(detHash(seed, salt) * array.length);
+      return array[idx];
+    }
+
+    function selectN(seed, salt, pool, count) {
+      let available = [...pool];
+      let selected = [];
+      for (let i = 0; i < count && available.length > 0; i++) {
+          let idx = Math.floor(detHash(seed, salt + i) * available.length);
+          selected.push(available.splice(idx, 1)[0]);
+      }
+      return selected;
+    }
+
+    function clamp(val, min, max) {
+      return Math.max(min, Math.min(max, val));
+    }
+
+    function getConf(certitude) {
+        if (typeof certitude === 'string') return `[${certitude.toUpperCase()}]`;
+        if (certitude >= 0.75) return "[OBSERVED]";
+        if (certitude >= 0.45) return "[LIKELY]";
+        return "[POSSIBLE]";
+    }
+
+    // URL
     function normalizeSeedString(seedLike) {
       const s = String(seedLike ?? "").trim();
       const digits = s.replace(/\D/g, "");
       if (!digits) return null;
-      const n = Math.min(parseInt(digits, 10) || 0, MAX_SEED);
+
+      const n = Math.min(parseInt(digits, 10) || 0, HUMAN_SEED);
       return String(n);
     }
 
@@ -183,6 +309,19 @@
     }
 
     function randomSeedString() {
+
+      const HUMAN_CHANCE = 1 / 10000;
+
+      if (Math.random() < HUMAN_CHANCE) {
+          return String(MAX_SEED + 1);
+      }
+
+      if (window.crypto && window.crypto.getRandomValues) {
+          const arr = new Uint32Array(1);
+          window.crypto.getRandomValues(arr);
+          return String(arr[0] % (MAX_SEED + 1));
+      }
+
       return String(Math.floor(Math.random() * (MAX_SEED + 1)));
     }
 
@@ -198,64 +337,181 @@
       const params = new URLSearchParams(window.location.search);
       const p = params.get("p");
       if (!p) return null;
-      try {
-          return extractSeedFromPath(decodeURIComponent(p));
-      } catch {
-          return null;
-      }
+      try { return extractSeedFromPath(decodeURIComponent(p)); } 
+      catch { return null; }
     }
 
     function updateURL(seed, push = false) {
-        const url = "/" + displaySeed(seed);
-        if (push) history.pushState({ seed }, "", url);
-        else history.replaceState({ seed }, "", url);
+      const url = "/" + displaySeed(seed);
+      if (push) history.pushState({ seed }, "", url);
+      else history.replaceState({ seed }, "", url);
     }
     
     function updateFavicon(canvas) {
-        let link = document.querySelector("link[rel~='icon']");
-        if (!link) {
-            link = document.createElement('link');
-            link.rel = 'icon';
-            document.head.appendChild(link);
-        }
-        link.href = canvas.toDataURL("image/png");
+      let link = document.querySelector("link[rel~='icon']");
+      if (!link) {
+          link = document.createElement('link');
+          link.rel = 'icon';
+          document.head.appendChild(link);
+      }
+      link.href = canvas.toDataURL("image/png");
     }
 
-    function fbm2D(x, y, octaves) {
-        let amp = 0.5, freq = 1, sum = 0, norm = 0;
-        for (let i = 0; i < octaves; i++) {
-            sum += amp * noise2D(x * freq, y * freq);
-            norm += amp;
-            amp *= 0.5;
-            freq *= 2.15;
+    // Hehehe
+    function createHumanAlien(seed) {
+        const alien = {
+            seed: seed,
+            genome: {
+                mass: 15000,
+                bodyPlan: 'Biped',
+                bodyLength: 1.5,
+                bodyWidth: 0.5,
+                limbPairsRaw: 0.5,
+                legLengthRaw: 0.8,
+                stanceRaw: 0.2,
+                headSize: 1.2,
+                headWidth: 1.0,
+                snoutLengthRaw: 0.1,
+                jawDepthRaw: 0.2,
+                chinTaper: 0.4,
+                headTilt: 0.0,
+                neckLengthRaw: 0.4,
+                eyeCount: 2,
+                mouthType: 'Jaw',
+                tailLength: 0.0,
+                tailType: 'None',
+                spineCurve: -0.6, 
+                skinHue: 0.05,
+                skinBrightness: 0.8,
+                skinPattern: 0.1,
+                patternStyle: 0.5,
+                patternContrast: 0.0,
+                paletteScheme: 'monochrome',
+                accentHueOffset: 0.0,
+                asymmetry: 0.05,
+                asymmetryBias: 1,
+                pupilType: 'round'
+            },
+            registry: {
+                curiosity: 2.8,
+                watchfulness: 0.1,
+                objectInterest: 2.8,
+                physicalSignature: 0.5
+            },
+            facts: {
+                bodyPlan: "Biped",
+                size: "Medium",
+                diet: "Carnivore",
+                vision: "Forward Vision",
+                locomotion: "Walking",
+                temperament: "Aggressive"
+            },
+            geometry: { allBones: [], eyePositions: [], head: {} },
+            materials: {
+                baseColorRGB: [224, 172, 148],
+                accentColorRGB: [210, 160, 138],
+                highlightColorRGB: [255, 220, 200],
+                eyeColorRGB: [80, 120, 200],
+                patternScaleMultiplier: 0.05
+            },
+            eyes: {
+                eyeCount: 2, scleraVisible: true, irisRadius: 0.45, pupilRadius: 0.35,
+                pupilType: "round", eyelidTop: 0.25, eyelidBottom: 0.25,
+                socketDepth: 0.3, highlightStrength: 0.8, irisPattern: 0.3
+            },
+            trace: { derived: {
+                physicalVector: [0.5, 0.5, 0.2, 0.5, 0.8, 0.2, 0.8, 0.5, 0.1, 0.2, 0.4, 0.5, 0.4, 0.0, 0.5],
+                physicalKeys: [
+                    'genome.mass', 'genome.bodyLength', 'genome.bodyWidth', 'genome.limbPairsRaw',
+                    'genome.legLengthRaw', 'genome.stanceRaw', 'genome.headSize', 'genome.headWidth',
+                    'genome.snoutLengthRaw', 'genome.jawDepthRaw', 'genome.chinTaper', 'genome.headTilt',
+                    'genome.neckLengthRaw', 'genome.tailLength', 'genome.spineCurve'
+                ]
+            } }
+        };
+
+        alien.physicalVector = Array.from(alien.trace.derived.physicalVector);
+        const h = alien.geometry;
+
+        function mkCap(ax, ay, bx, by, r1, r2, op='smooth_add', k=4) {
+            return {
+                op, k,
+                evaluate(px, py) {
+                    const dx = bx - ax, dy = by - ay;
+                    const L = Math.sqrt(dx * dx + dy * dy);
+                    if (L === 0) return Math.hypot(px - ax, py - ay) - Math.max(r1, r2);
+                    if (L <= Math.abs(r1 - r2)) return r1 > r2 ? Math.hypot(px - ax, py - ay) - r1 : Math.hypot(px - bx, py - by) - r2;
+                    const dirX = dx / L, dirY = dy / L;
+                    const tx = px - ax, ty = py - ay;
+                    const y = tx * dirX + ty * dirY; const x = Math.abs(tx * -dirY + ty * dirX); 
+                    const sinT = (r1 - r2) / L; const cosT = Math.sqrt(Math.max(0.0, 1.0 - sinT * sinT));
+                    const proj = y * cosT - x * sinT;
+                    if (proj <= 0.0) return Math.hypot(x, y) - r1;
+                    if (proj >= L * cosT) return Math.hypot(x, y - L) - r2;
+                    return x * cosT + y * sinT - r1;
+                },
+                bounds() { const r = Math.max(r1, r2); return { minX: Math.min(ax - r, bx - r), minY: Math.min(ay - r, by - r), maxX: Math.max(ax + r, bx + r), maxY: Math.max(ay + r, by + r) }; },
+                translate(dx, dy) { ax += dx; ay += dy; bx += dx; by += dy; },
+                scale(s) { ax *= s; ay *= s; bx *= s; by *= s; r1 *= s; r2 *= s; k *= s; },
+                squeezeAxis(axis, factor, center) {
+                    if (axis === 'x') { ax = center + (ax - center) * factor; bx = center + (bx - center) * factor; }
+                    else { ay = center + (ay - center) * factor; by = center + (by - center) * factor; }
+                }
+            };
         }
-        return sum / norm;
+
+        function mkSph(x, y, r, op='smooth_add', k=4) {
+            return {
+                op, k,
+                evaluate(px, py) { return Math.hypot(px - x, py - y) - r; },
+                bounds() { return { minX: x - r, minY: y - r, maxX: x + r, maxY: y + r }; },
+                translate(dx, dy) { x += dx; y += dy; },
+                scale(s) { x *= s; y *= s; r *= s; k *= s; },
+                squeezeAxis(axis, factor, center) {
+                    if (axis === 'x') x = center + (x - center) * factor;
+                    else y = center + (y - center) * factor;
+                }
+            };
+        }
+
+        // Spine / Torso 
+        h.allBones.push(mkCap(0, 10, 0, 35, 14, 11, 'smooth_add', 8)); // Chest to waist
+        h.allBones.push(mkCap(0, 35, 0, 45, 11, 13, 'smooth_add', 6));
+
+        // Head & Neck
+        h.allBones.push(mkCap(0, 10, 0, -5, 5, 5, 'smooth_add', 4)); // Neck
+        h.allBones.push(mkSph(0, -15, 11, 'smooth_add', 4)); 
+        h.allBones.push(mkCap(0, -15, 0, -5, 11, 7, 'smooth_add', 4)); 
+
+        h.head.headCenter = { x: 0, y: -12 };
+        h.head.headR = 11;
+
+        // Eyes
+        const eyeR = 2.2;
+        h.eyePositions.push({ x: -4, y: -13, radius: eyeR });
+        h.eyePositions.push({ x: 4, y: -13, radius: eyeR });
+        h.allBones.push(mkSph(-4, -13, eyeR * 1.3, 'subtract', 0));
+        h.allBones.push(mkSph(4, -13, eyeR * 1.3, 'subtract', 0));
+
+        // Arms
+        h.allBones.push(mkCap(-14, 12, -22, 30, 4.5, 3.5, 'smooth_add', 3));
+        h.allBones.push(mkCap(14, 12, 22, 30, 4.5, 3.5, 'smooth_add', 3));
+        h.allBones.push(mkCap(-22, 30, -26, 50, 3.5, 2.5, 'smooth_add', 3));
+        h.allBones.push(mkCap(22, 30, 26, 50, 3.5, 2.5, 'smooth_add', 3));
+
+        // Legs
+        h.allBones.push(mkCap(-6, 42, -9, 75, 6, 4.5, 'smooth_add', 4));
+        h.allBones.push(mkCap(6, 42, 9, 75, 6, 4.5, 'smooth_add', 4));
+        h.allBones.push(mkCap(-9, 75, -9, 110, 4.5, 3, 'smooth_add', 4));
+        h.allBones.push(mkCap(9, 75, 9, 110, 4.5, 3, 'smooth_add', 4));
+        
+        // Feet
+        h.allBones.push(mkCap(-9, 110, -14, 113, 3, 2, 'smooth_add', 2));
+        h.allBones.push(mkCap(9, 110, 14, 113, 3, 2, 'smooth_add', 2));
+
+        return alien;
     }
 
-    function computePatternMod(px, py, patScale, patternType, patternStyle) {
-        if (patternType < 0.25) { 
-            const n = fbm2D(px * patScale, py * patScale, 3);
-            const thresh = 0.55 + patternStyle * 0.15;
-            return n > thresh ? Math.min(1, (n - thresh) * 5) : 0;
-        }
-        if (patternType < 0.5) { 
-            const warp = fbm2D(px * patScale * 0.4, py * patScale * 0.4, 2) * 6;
-            const s = Math.sin(px * patScale * (2 + patternStyle * 4) + warp);
-            return s > 0.25 ? Math.min(1, (s - 0.25) * 2) : 0;
-        }
-        if (patternType < 0.75) { 
-            const freq = patScale * (2.2 + patternStyle * 1.5);
-            const row = Math.floor(py * freq);
-            const rowOffset = (row % 2) * 0.5;
-            const col = Math.floor(px * freq + rowOffset);
-            const cellV = hash21(col, row); 
-            const fx = (px * freq + rowOffset) - col - 0.5;
-            const fy = (py * freq) - row - 0.5;
-            const edge = 1 - Math.min(1, Math.hypot(fx, fy) * 1.8);
-            return cellV > 0.4 ? Math.max(0, edge) : 0;
-        }
-        return fbm2D(px * patScale, py * patScale, 4);
-    }
 
     function drawEyes(ctx, eyeGenome, positions, skinColorRGB, eyeColorRGB) {
         if (eyeGenome.eyeCount === 0 || !positions) return;
@@ -355,9 +611,15 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const numSeed = parseInt(seed, 10);
-      const alien = generateAlien(numSeed);
+      
+      let alien;
+      if (numSeed === HUMAN_SEED) {
+          alien = createHumanAlien(numSeed);
+      } else {
+          alien = AlienEngine.generate(numSeed);
+      }
 
-      fitToBounds(alien, canvas.width, canvas.height, 60);
+      AlienEngine.fitToBounds(alien, canvas.width, canvas.height, 60);
 
       const allBones = alien.geometry.allBones;
       const head = alien.geometry.head;
@@ -379,17 +641,51 @@
       const lx = -0.5, ly = -0.5, lz = 0.8;
       const flx = 0.65, fly = 0.45, flz = 0.35;
 
+      const fbm2D = (x, y, octaves) => {
+          let amp = 0.5, freq = 1, sum = 0, norm = 0;
+          for (let i = 0; i < octaves; i++) {
+              sum += amp * AlienEngine.noise2D(x * freq, y * freq);
+              norm += amp; amp *= 0.5; freq *= 2.15;
+          }
+          return sum / norm;
+      };
+
+      const computePatternMod = (px, py) => {
+          if (patType < 0.25) { 
+              const n = fbm2D(px * patScale, py * patScale, 3);
+              const thresh = 0.55 + patStyle * 0.15;
+              return n > thresh ? Math.min(1, (n - thresh) * 5) : 0;
+          }
+          if (patType < 0.5) { 
+              const warp = fbm2D(px * patScale * 0.4, py * patScale * 0.4, 2) * 6;
+              const s = Math.sin(px * patScale * (2 + patStyle * 4) + warp);
+              return s > 0.25 ? Math.min(1, (s - 0.25) * 2) : 0;
+          }
+          if (patType < 0.75) { 
+              const freq = patScale * (2.2 + patStyle * 1.5);
+              const row = Math.floor(py * freq);
+              const rowOffset = (row % 2) * 0.5;
+              const col = Math.floor(px * freq + rowOffset);
+              const fx = (px * freq + rowOffset) - col - 0.5;
+              const fy = (py * freq) - row - 0.5;
+              let cellHash = Math.sin(col * 12.9898 + row * 78.233) * 43758.5453;
+              cellHash -= Math.floor(cellHash);
+              const edge = 1 - Math.min(1, Math.hypot(fx, fy) * 1.8);
+              return cellHash > 0.4 ? Math.max(0, edge) : 0;
+          }
+          return fbm2D(px * patScale, py * patScale, 4);
+      };
+
       for (let py = 0; py < canvas.height; py++) {
         for (let px = 0; px < canvas.width; px++) {
-
-          const d = evaluateField(px, py, allBones);
+          const d = AlienEngine.evaluateField(px, py, allBones);
           
           if (d < 1.0) {
             const idx = (py * canvas.width + px) * 4;
             const alpha = Math.max(0, Math.min(1, 1.0 - d));
             
-            const dx = evaluateField(px + eps, py, allBones) - d;
-            const dy = evaluateField(px, py + eps, allBones) - d;
+            const dx = AlienEngine.evaluateField(px + eps, py, allBones) - d;
+            const dy = AlienEngine.evaluateField(px, py + eps, allBones) - d;
             const nz = 1.5;
             const nLen = Math.hypot(dx, dy, nz);
             const nx = dx / nLen, ny = dy / nLen, normZ = nz / nLen;
@@ -406,7 +702,7 @@
               intensity += headGlow;
             }
 
-            const patternMod = computePatternMod(px, py, patScale, patType, patStyle) * patContrast;
+            const patternMod = computePatternMod(px, py) * patContrast;
 
             const pR = baseR * (1 - patternMod) + accR * patternMod;
             const pG = baseG * (1 - patternMod) + accG * patternMod;
@@ -427,53 +723,219 @@
       return alien;
     }
 
-    function updateInfo(alien, seed) {
-      const g = alien.genome;
+    const SharedTraitMap = {
+        "Similar mass": "Similar body proportions",
+        "Similar body length": "Similar body proportions",
+        "Similar body width": "Similar body proportions",
+        "Similar limb count": "Similar limb structure",
+        "Similar leg length": "Similar limb structure",
+        "Similar stance": "Similar posture",
+        "Similar head size": "Similar head profile",
+        "Similar head width": "Similar head profile",
+        "Similar snout length": "Similar head profile",
+        "Similar jaw depth": "Similar head profile",
+        "Similar chin taper": "Similar head profile",
+        "Similar head tilt": "Similar posture",
+        "Similar neck length": "Similar neck length",
+        "Similar tail length": "Similar tail length",
+        "Similar spine curvature": "Similar posture"
+    };
+
+    function buildDataHTML(alien, seed) {
+        const numSeed = parseInt(seed, 10);
+        
+        initializeLocalDB();
+        prepareEntity(alien, numSeed);
+        const currentDB = [...localDB, alien];
+        
+        const g = alien.genome;
+        const reg = alien.registry;
+        const facts = alien.facts;
+
+        let fingerprint = "UNKNOWN";
+        let closestSeedNum = null;
+        let closestFingerprint = "UNKNOWN";
+        let similarityScore = 0;
+        let rawSharedTraits = [];
+
+        if (typeof RegistryEngine !== 'undefined') {
+            try {
+                fingerprint = RegistryEngine.buildFingerprint(alien);
+                closestSeedNum = RegistryEngine.findClosestOverall(numSeed, currentDB);
+                const closestEntity = currentDB.find(a => a.seed === closestSeedNum);
+                
+                if (closestEntity) {
+                    closestFingerprint = RegistryEngine.buildFingerprint(closestEntity);
+                    similarityScore = RegistryEngine.computeSimilarity(alien, closestEntity).overall;
+                    rawSharedTraits = RegistryEngine.computeSharedTraits(alien, closestEntity);
+                }
+            } catch (e) {
+               
+            }
+        }
+        
+        const mappedTraits = rawSharedTraits.map(t => SharedTraitMap[t] || t);
+        const uniqueTraits = [...new Set(mappedTraits)].slice(0, 3);
+
+        const nCur = clamp((reg.curiosity + 0.4) / 2.8, 0, 1);
+        const nWat = clamp((reg.watchfulness - 0.2) / 2.0, 0, 1);
+        const nInt = clamp((reg.objectInterest - 0.25) / 2.6, 0, 1);
+
+        const states = {
+            explorationDrive: 0.5 * nCur + 0.5 * nInt,
+            caution: nWat,
+            boldness: 1.0 - nWat,
+            fixation: nInt,
+            volatility: Math.abs(nCur - nWat),
+            environmentalAttachment: 0.6 * nInt + 0.4 * reg.physicalSignature,
+            diet: facts.diet,
+            size: facts.size,
+            locomotion: facts.locomotion,
+            temperament: facts.temperament
+        };
+
+        const observations = [
+            // MORPHOLOGY
+            { section: 'MORPHOLOGY', cond: () => g.mass > 30000 && g.stanceRaw > 0.6, cert: 0.9, text: "Motion reconstruction implies high-density skeletal structuring to prevent collapse." },
+            { section: 'MORPHOLOGY', cond: () => g.mass < 8000 && g.legLengthRaw > 0.6, cert: 0.85, text: "Thermal analysis suggests minimal mass, indicating low kinetic resistance during traversal." },
+            { section: 'MORPHOLOGY', cond: () => g.bodyWidth > 1.6 && g.stanceRaw < 0.4, cert: 0.75, text: "Repeated motion reconstruction indicates high lateral stability during rapid directional changes." },
+            { section: 'MORPHOLOGY', cond: () => g.bodyWidth < 0.6, cert: 0.8, text: "Lidar sweeps reveal slender lateral proportions, likely facilitating navigation through dense occlusion." },
+            { section: 'MORPHOLOGY', cond: () => g.stanceRaw > 0.75, cert: 0.85, text: "Wide stance suggests stable movement across irregular topography." },
+            { section: 'MORPHOLOGY', cond: () => g.stanceRaw < 0.25, cert: 0.8, text: "Narrow postural stance reduces substrate footprint; full stability baseline remains unconfirmed." },
+            { section: 'MORPHOLOGY', cond: () => g.tailLength > 2.5 && g.mass > 15000, cert: 0.8, text: "Motion reconstruction predicts the elongated caudal appendage functions as a kinetic counterbalance." },
+            { section: 'MORPHOLOGY', cond: () => g.spineCurve > 0.5, cert: 0.7, text: "Dorsal curvature inherently lowers the center of gravity; classification remains provisional." },
+            { section: 'MORPHOLOGY', cond: () => g.spineCurve < -0.5 && states.locomotion === 'Walking', cert: 0.75, text: "Ventral spinal bowing implies tension-based kinetic energy storage for sudden acceleration." },
+            { section: 'MORPHOLOGY', cond: () => g.asymmetry > 0.6, cert: 0.9, text: "Optical locks repeatedly fail due to highly asymmetrical silhouette." },
+            { section: 'MORPHOLOGY', cond: () => g.asymmetry < 0.15, cert: 0.85, text: "Passive sensor arrays record near-perfect bilateral symmetry, implying stable developmental conditions." },
+            { section: 'MORPHOLOGY', cond: () => g.eyeCount === 0, cert: 0.95, text: "Optical sensors appear absent; probabilistic models assume non-visual mapping modalities." },
+            { section: 'MORPHOLOGY', cond: () => g.eyeCount === 1, cert: 0.85, text: "Singular optic structure detected, suggesting reliance on ambient light gathering over binocular depth estimation." },
+            { section: 'MORPHOLOGY', cond: () => g.bodyPlan === 'Serpentine', cert: 0.95, text: "Seismic monitoring confirms continuous substrate contact; axial mass distribution observed." },
+            { section: 'MORPHOLOGY', cond: () => (g.bodyPlan === 'Radial' || g.bodyPlan === 'Cephalopod'), cert: 0.9, text: "Radial appendage distribution permits omnidirectional traversal without reorienting core mass." },
+            { section: 'MORPHOLOGY', cond: () => g.snoutLengthRaw > 0.7 && states.diet === 'Carnivore', cert: 0.85, text: "Extended anterior structure supports deep probing into concealed thermal pockets." },
+            { section: 'MORPHOLOGY', cond: () => g.limbPairsRaw > 0.6, cert: 0.9, text: "Multi-limb configuration suggests significant redundancy during complex terrain traversal." },
+            { section: 'MORPHOLOGY', cond: () => g.jawDepthRaw > 0.7, cert: 0.8, text: "Pronounced mandibular depth implies biomechanical adaptations for high-force material processing." },
+            { section: 'MORPHOLOGY', cond: () => g.jawDepthRaw < 0.3, cert: 0.75, text: "Shallow mandibular structure suggests consumption restricted to easily processed localized matter." },
+            { section: 'MORPHOLOGY', cond: () => g.chinTaper > 0.8, cert: 0.7, text: "Sharp cranial tapering improves dynamic efficiency during rapid environmental traversal." },
+            { section: 'MORPHOLOGY', cond: () => g.neckLengthRaw > 0.7 && g.headSize > 1.0, cert: 0.85, text: "Elongated cervical structure effectively isolates the primary sensory cluster from the main thermal mass." },
+            { section: 'MORPHOLOGY', cond: () => g.neckLengthRaw < 0.2, cert: 0.8, text: "Truncated cervical development restricts independent cranial rotation; full body pivoting required." },
+            { section: 'MORPHOLOGY', cond: () => g.headTilt > 0.2, cert: 0.75, text: "Upward cranial articulation implies persistent monitoring of aerial or elevated thermal signatures." },
+            { section: 'MORPHOLOGY', cond: () => g.headTilt < -0.2, cert: 0.75, text: "Downward cranial articulation suggests primary focus on substrate-level resources or seismic activity." },
+            
+            // BEHAVIOUR
+            { section: 'BEHAVIOUR', cond: () => states.explorationDrive > 0.75 && states.caution < 0.3, cert: states.explorationDrive * (1 - states.caution), text: "Repeated remote observations indicate unhesitating approaches toward automated monitoring stations." },
+            { section: 'BEHAVIOUR', cond: () => states.explorationDrive > 0.75 && states.caution > 0.7, cert: states.explorationDrive * states.caution, text: "Orbital telemetry suggests prolonged inspection of unfamiliar structures before immediate withdrawal." },
+            { section: 'BEHAVIOUR', cond: () => states.explorationDrive < 0.25, cert: 1 - states.explorationDrive, text: "Thermal mapping indicates prolonged stagnation within narrow geographical parameters." },
+            { section: 'BEHAVIOUR', cond: () => states.fixation > 0.75, cert: states.fixation, text: "Long-term automated monitoring recorded extensive time dedicated to examining localized anomalies." },
+            { section: 'BEHAVIOUR', cond: () => states.volatility > 0.7, cert: states.volatility, text: "Probabilistic models fail to predict movement patterns; entity displays extreme navigational variance." },
+            { section: 'BEHAVIOUR', cond: () => states.volatility < 0.2, cert: 1 - states.volatility, text: "Motion vectors remain highly consistent across multiple orbital sweeps." },
+            { section: 'BEHAVIOUR', cond: () => states.boldness > 0.8 && states.temperament === 'Aggressive', cert: states.boldness, text: "Postural displays aggressively challenge automated vehicles encroaching on its immediate perimeter." },
+            { section: 'BEHAVIOUR', cond: () => states.boldness < 0.2 && states.temperament === 'Skittish', cert: 1 - states.boldness, text: "Primary response to atmospheric disturbance involves immediate, rapid relocation to dense cover." },
+            { section: 'BEHAVIOUR', cond: () => states.caution > 0.8, cert: states.caution, text: "Passive sensor arrays consistently lose optical lock due to the entity's rapid evasion behaviors." },
+            { section: 'BEHAVIOUR', cond: () => states.fixation > 0.8 && states.diet === 'Herbivore', cert: states.fixation, text: "Demonstrates prolonged focus on specific organic structures beyond standard biological necessities." },
+            { section: 'BEHAVIOUR', cond: () => g.eyeCount === 0 && states.caution > 0.7, cert: states.caution, text: "Reacts instantly to micro-seismic shifts, compensating for the lack of visual telemetry." },
+            { section: 'BEHAVIOUR', cond: () => nCur > 0.8 && g.mass > 25000, cert: nCur, text: "Investigation tactics are forceful, frequently resulting in the unintentional disruption of sensor equipment." },
+            { section: 'BEHAVIOUR', cond: () => nCur > 0.8 && g.mass < 8000, cert: nCur, text: "Utilizes highly precise, low-impact movements when investigating deployed monitoring hardware." },
+            
+            // ECOLOGY
+            { section: 'ECOLOGY', cond: () => states.diet === 'Carnivore' && states.temperament === 'Aggressive', cert: 0.9, text: "Spectroscopy and thermal tracking suggest active pursuit and exhaustion of local biomass." },
+            { section: 'ECOLOGY', cond: () => states.diet === 'Carnivore' && states.temperament === 'Skittish', cert: 0.8, text: "Probabilistic models suggest reliance on ambush tactics or passive scavenging to avoid direct confrontation." },
+            { section: 'ECOLOGY', cond: () => states.diet === 'Herbivore' && states.environmentalAttachment > 0.7, cert: states.environmentalAttachment, text: "Long-term automated monitoring indicates localized foraging restricted to specific environmental zones." },
+            { section: 'ECOLOGY', cond: () => states.diet === 'Herbivore' && states.environmentalAttachment < 0.3, cert: 1 - states.environmentalAttachment, text: "Demonstrates nomadic resource gathering, rarely depleting a single geographical area before migrating." },
+            { section: 'ECOLOGY', cond: () => states.diet === 'Filter Feeder', cert: 0.95, text: "Atmospheric disturbance readings imply passive particulate absorption as a primary energy source." },
+            { section: 'ECOLOGY', cond: () => states.environmentalAttachment > 0.8, cert: states.environmentalAttachment, text: "Shows extreme reluctance to migrate; biological signatures remain tethered to specific structural anchors." },
+            { section: 'ECOLOGY', cond: () => states.environmentalAttachment < 0.2, cert: 1 - states.environmentalAttachment, text: "Cross-correlation of archived scans reveals a highly transient, non-anchored trajectory." },
+            { section: 'ECOLOGY', cond: () => states.locomotion === 'Slithering', cert: 0.9, text: "Motion reconstruction predicts exceptionally high efficiency on uneven substrates." },
+            { section: 'ECOLOGY', cond: () => states.locomotion === 'Walking' && g.mass > 20000, cert: (g.mass - 20000) / 30000, text: "Pedal locomotion creates significant micro-seismic disturbances, easily detectable by remote arrays." },
+            { section: 'ECOLOGY', cond: () => g.bodyPlan === 'Tripod', cert: 0.85, text: "Tri-lateral ground contact provides unique static stability on severely inclined geological formations." },
+            { section: 'ECOLOGY', cond: () => g.legLengthRaw > 0.7, cert: (g.legLengthRaw - 0.7) / 0.3, text: "Extended limb proportions elevate the primary core above local ground-level obstructions." },
+            { section: 'ECOLOGY', cond: () => g.legLengthRaw < 0.3, cert: (0.3 - g.legLengthRaw) / 0.3, text: "Shortened limb proportions keep the core thermal mass insulated against extreme substrate temperatures." },
+
+            // OBSERVATIONS
+            { section: 'OBSERVATIONS', cond: () => true, cert: 0.6, text: "Classification remains provisional due to incomplete surface penetration by remote sensors." },
+            { section: 'OBSERVATIONS', cond: () => true, cert: 0.5, text: "Thermal analysis suggests localized metabolic variations during high-speed traversal." },
+            { section: 'OBSERVATIONS', cond: () => true, cert: 0.7, text: "Repeated orbital passes indicate entity deliberately avoids zones of high seismic activity." },
+            { section: 'OBSERVATIONS', cond: () => true, cert: 0.75, text: "Long-range spectroscopy indicates surface compounds that periodically disrupt standard optical targeting." },
+            { section: 'OBSERVATIONS', cond: () => true, cert: 0.45, text: "Remote monitoring reveals periodic, low-energy stasis phases unaligned with local cycles." },
+            { section: 'OBSERVATIONS', cond: () => states.caution > 0.8 && states.explorationDrive < 0.3, cert: states.caution, text: "Observation windows are typically brief due to the target's rapid evasion protocols upon sensor detection." },
+            { section: 'OBSERVATIONS', cond: () => states.explorationDrive > 0.8 && states.caution < 0.3, cert: states.explorationDrive, text: "Entity's lack of evasion has allowed for unusually extensive, high-fidelity structural scans." },
+            { section: 'OBSERVATIONS', cond: () => states.temperament === 'Aggressive' && states.size === 'Massive', cert: 0.95, text: "Automated threat-assessment algorithms flag significant kinetic danger to deployed surface hardware." },
+            { section: 'OBSERVATIONS', cond: () => states.temperament === 'Skittish' && states.size === 'Small', cert: 0.9, text: "Extensive passive camouflage and thermal masking frequently result in premature loss of optical lock." },
+            { section: 'OBSERVATIONS', cond: () => states.volatility > 0.7, cert: states.volatility, text: "Classification confidence remains low due to highly erratic threat-assessment responses." },
+            { section: 'OBSERVATIONS', cond: () => Math.abs(g.spineCurve) > 0.4 && g.asymmetry > 0.6, cert: g.asymmetry, text: "Initial orbital reports frequently misclassified this signature due to highly irregular postural geometry." },
+            { section: 'OBSERVATIONS', cond: () => g.mass > 30000 && states.locomotion === 'Walking', cert: (g.mass - 30000) / 20000, text: "Remote telemetry consistently documents rapid kinetic exhaustion, likely due to massive metabolic constraints." },
+            { section: 'OBSERVATIONS', cond: () => states.diet === 'Carnivore' && states.size === 'Small', cert: 0.85, text: "Archived records indicate this signature was initially classified as a scavenger until active predation was confirmed." },
+            { section: 'OBSERVATIONS', cond: () => nInt > 0.7 && states.caution < 0.5, cert: nInt, text: "Entity frequently triggers automated proximity sensors during localized investigative routines." },
+            { section: 'OBSERVATIONS', cond: () => g.stanceRaw > 0.7, cert: (g.stanceRaw - 0.7) / 0.3, text: "Wide stance leaves broad, easily trackable impressions detectable by low-orbit topological sweeps." },
+            { section: 'OBSERVATIONS', cond: () => g.asymmetry > 0.7, cert: (g.asymmetry - 0.7) / 0.3, text: "Observation systems frequently lose tracking locks when the entity utilizes its highly asymmetric profile in dense occlusion." },
+            { section: 'OBSERVATIONS', cond: () => states.diet === 'Carnivore' && states.temperament === 'Skittish', cert: 0.8, text: "Archived telemetry initially suggested a detritivore classification until prolonged thermal monitoring revealed ambush behaviors." }
+        ];
+
+        const validObs = observations.filter(o => o.cond());
+
+        const selections = {
+            'MORPHOLOGY': selectN(seed, "morph", validObs.filter(o => o.section === 'MORPHOLOGY'), 3 + Math.floor(detHash(seed, "mC") * 2)),
+            'BEHAVIOUR': selectN(seed, "behav", validObs.filter(o => o.section === 'BEHAVIOUR'), 4 + Math.floor(detHash(seed, "bC") * 2)),
+            'ECOLOGY': selectN(seed, "eco", validObs.filter(o => o.section === 'ECOLOGY'), 3 + Math.floor(detHash(seed, "eC") * 2)),
+            'OBSERVATIONS': selectN(seed, "obs", validObs.filter(o => o.section === 'OBSERVATIONS'), 4 + Math.floor(detHash(seed, "oC") * 2))
+        };
+
+    
+        let html = '';
+
+        // IDENTITY
+        html += `
+          <div class="data-section">
+            <span class="data-header">// IDENTITY</span>
+            <div class="data-entry"><span class="entry-label">Entity Seed:</span> ${displaySeed(numSeed)}</div>
+            <div class="data-entry"><span class="entry-label">Registry ID:</span> ${numSeed === HUMAN_SEED ? 'REG-H0M0S4P' : fingerprint}</div>
+          </div>
+        `;
+
       
-      const pick = (val, arr) => arr[Math.floor(Math.abs(val) * 1000) % arr.length];
+        const renderOrder = ['MORPHOLOGY', 'BEHAVIOUR', 'ECOLOGY', 'OBSERVATIONS'];
+        renderOrder.forEach(sec => {
+            if (selections[sec] && selections[sec].length > 0) {
+                html += `<div class="data-section"><span class="data-header">// ${sec}</span>`;
+                selections[sec].forEach((item) => {
+                    const conf = getConf(item.cert);
+                    html += `<div class="data-entry"><span class="entry-confidence">${conf}</span> ${item.text}</div>`;
+                });
+                html += `</div>`;
+            }
+        });
 
-      const biochem = pick(g.skinHue + g.skinBrightness, [
-          "Ammonia-solvent", "Methane-based", "Silicate-lattice", "Carbon-aqueous", 
-          "Sulfuric-based", "Fluorocarbon", "Heavy-metal rich", "Cyanide-metabolizing"
-      ]);
-      
-      const integument = pick(g.skinPattern + g.patternContrast, [
-          "Chitinous Plating", "Bioluminescent Epidermis", "Permeable Membrane", "Dermal Denticles", 
-          "Silicate Scales", "Refractive Carapace", "Porous Exoskeleton", "Fibrous Matte",
-          "Thermal-absorbent", "Crystalline Crust"
-      ]);
+        // SIMILAR ENTITY
+        let sharedText = uniqueTraits.length > 0 
+            ? uniqueTraits.map(t => `<br>&nbsp;&nbsp;• ${t}`).join('') 
+            : "<br>&nbsp;&nbsp;• Insufficient baseline overlap";
 
-      const sensory = pick(g.headTilt + g.neckLengthRaw, [
-          "Electroreception", "Magnetoreception", "Thermal-pit Arrays", "Infrasonic Tremors", 
-          "Chemosensory Tendrils", "Echolocation", "Radio-frequency", "Hyper-olfaction",
-          "Seismic Vibration"
-      ]);
+        if (closestSeedNum !== null) {
+            const simPct = (similarityScore * 100).toFixed(1);
+            html += `
+              <div class="data-section">
+                <span class="data-header">// SIMILAR ENTITY</span>
+                <div class="data-entry"><span class="entry-label">Entity Seed:</span> ${displaySeed(closestSeedNum)}</div>
+                <div class="data-entry"><span class="entry-label">Registry ID:</span> ${closestFingerprint}</div>
+                <div class="data-entry"><span class="entry-label">Estimated Similarity:</span> ${simPct}%</div>
+                <div class="data-entry"><span class="entry-label">Shared Traits:</span>${sharedText}</div>
+              </div>
+            `;
+        } else {
+            html += `
+              <div class="data-section">
+                <span class="data-header">// SIMILAR ENTITY</span>
+                <div class="data-entry"><span class="entry-label">Status:</span> Search unavailable or local cache empty.</div>
+              </div>
+            `;
+        }
 
-      const circulation = pick(g.stanceRaw + g.legLengthRaw, [
-          "Hemocyanin-rich", "Open-circulatory", "Hydrostatic", "Cryogenic fluid", 
-          "Copper-based", "Iron-based", "Cobalt-based", "Pneumatic-driven"
-      ]);
-
-      const ecology = pick(g.limbPairsRaw + g.mass, [
-          "Apex Ambush", "Detritivore / Scavenger", "Parasitic Vector", "Symbiotic Carrier", 
-          "Hive-Mind Drone", "Nomadic Grazer", "Benthic Crawler", "Arboreal Stalker",
-          "Filter-sifter", "Lithotroph (Rock-eater)"
-      ]);
-
-      document.getElementById("alienData").innerHTML = `
-        <span style="color:#fff">Seed:</span> ${displaySeed(seed)}<br><br>
-        <span style="color:#fff">Ecology:</span> ${ecology}<br>
-        <span style="color:#fff">Biochemistry:</span> ${biochem}<br>
-        <span style="color:#fff">Sensory Mode:</span> ${sensory}<br>
-        <span style="color:#fff">Integument:</span> ${integument}<br>
-        <span style="color:#fff">Circulation:</span> ${circulation}<br>
-      `;
+        document.getElementById("alienData").innerHTML = html;
     }
 
     function newAlien(mode = "input", urlSeed = null) {
       const dataEl = document.getElementById("alienData");
       const input = document.getElementById("seedInput");
-      dataEl.textContent = "Generating SDF... please wait.";
+      dataEl.textContent = "Interfacing with telemetry archive...";
 
       setTimeout(() => {
         let seed = null;
@@ -488,7 +950,7 @@
         updateURL(seed, push);
 
         const alien = renderAlien("alienCanvas", seed);
-        updateInfo(alien, seed);
+        buildDataHTML(alien, seed);
       }, 20);
     }
 
