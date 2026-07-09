@@ -31,6 +31,7 @@ The project explores how complex creatures can emerge entirely from deterministi
 - Procedurally generated anatomy and biological traits
 - Browser-based renderer
 - No AI or stored assets
+- There is an Easter Egg in there... something related to the <abbr title="It can only generate (2³² - 1) in reality">Mulberry32 limitations</abbr>
 
 **Exactly 4,294,967,296** unique deterministic aliens can be generated.
 
