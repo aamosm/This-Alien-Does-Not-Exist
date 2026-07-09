@@ -998,7 +998,6 @@
             <span class="entry-label">Entity Seed:</span> <span id="seedValue">${displaySeed(numSeed)}</span>
             <button class="copy-btn" id="copySeedBtn" type="button" aria-label="Copy seed">${COPY_ICON}</button>
           </div>
-          <div class="data-entry"><span class="entry-label">Registry ID:</span> <span class="registry-id">${numSeed === HUMAN_SEED ? 'REG-H0M0S4P' : fingerprint}</span></div>
           ${distinguishing ? `<div class="data-entry"><span class="entry-label">Distinguishing Trait:</span> ${distinguishing}</div>` : ""}
         `;
         html += sectionBlock("IDENTITY", identityInner);
@@ -1022,7 +1021,6 @@
             const simPct = (similarityScore * 100).toFixed(1);
             const similarInner = `
                 <div class="data-entry"><span class="entry-label">Entity Seed:</span> ${makeSeedLink(closestSeedNum)}</div>
-                <div class="data-entry"><span class="entry-label">Registry ID:</span> <span class="registry-id">${closestFingerprint}</span></div>
                 <div class="data-entry"><span class="entry-label">Estimated Similarity:</span> ${simPct}%</div>
                 <div class="data-entry"><span class="entry-label">Shared Traits:</span>${sharedText}</div>
             `;
