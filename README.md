@@ -26,7 +26,7 @@ The project explores how complex creatures can emerge entirely from deterministi
 ## Features
 
 - Deterministic generation
-- 4,294,967,296 (2³² seeds) unique creatures
+- 4,294,967,296 (2³² seeds) unique creatures and one more
 - Permanent, shareable URL for every creature
 - Procedurally generated anatomy and biological traits
 - Browser-based renderer
