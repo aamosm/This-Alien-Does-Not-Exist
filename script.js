@@ -80,7 +80,6 @@ const BodyPlanConfigs = {
     Biped: { thoraxRatio: 0.22, pelvisRatio: 0.62, segmentCount: 5, allowsLimbs: true },
     Winged: { thoraxRatio: 0.48, pelvisRatio: 0.80, segmentCount: 6, allowsLimbs: true },
     Tripod: { thoraxRatio: 0.30, pelvisRatio: 0.85, segmentCount: 5, allowsLimbs: true },
-    // Arthropod family: segmentCount doubles here as "has a visible waist" for TorsoArthropod (3+ = insect-style thorax/abdomen split)
     Insectoid: { thoraxRatio: 0.35, pelvisRatio: 0.55, segmentCount: 3, allowsLimbs: true },
     Arachnoid: { thoraxRatio: 0.55, pelvisRatio: 0.55, segmentCount: 2, allowsLimbs: true },
     Arthropod: { thoraxRatio: 0.40, pelvisRatio: 0.90, segmentCount: 3, allowsLimbs: true },
@@ -176,11 +175,9 @@ class CreatureContext {
         this.seed = seed;
         this.genome = {};
         
-        // Single state repository passed to all generators
         this.primitives = [];
         this.sockets = {};
         
-        // Structures that UI expects to consume
         this.geometry = { allBones: this.primitives, eyePositions: [], head: {} };
         this.materials = {};
         this.eyes = {};
@@ -196,7 +193,6 @@ class CreatureContext {
         return this.sockets[name]; 
     }
     
-    // Surface Sampling API - Plugs into CSG boundary
     sampleBoundary(startX, startY, dirX, dirY, maxSteps = 20) {
         let px = startX, py = startY;
         for (let i = 0; i < maxSteps; i++) {
@@ -211,7 +207,6 @@ class CreatureContext {
 /* ============================================================
    4. GENOME GENERATION & CONSTRAINT SOLVERS
    ============================================================ */
-// Note: Naked numbers are used for performance; heavy Trait() wrappers have been removed.
 function generateGenome(seed) {
     const rng = mulberry32(subSeed(seed, "genome"));
     const skew = (p) => Math.pow(rng(), p);
@@ -256,7 +251,6 @@ function applyCorrelations(genome, seed) {
     const rng = mulberry32(subSeed(seed, "ecology"));
     genome.niche = weightedChoice(rng, [[0.45, "Predator"], [0.40, "Prey"], [0.15, "FilterFeeder"]]);
 
-    // Correlation biases
     if (genome.niche === "Predator") {
         genome.jawDepthRaw = lerp(genome.jawDepthRaw, 1.0, 0.6); 
         genome.neckLengthRaw = lerp(genome.neckLengthRaw, 0.5, 0.4); 
@@ -276,13 +270,12 @@ function applyCorrelations(genome, seed) {
 }
 
 function applyConstraints(genome) {
-    // Constraint Propagation
     const maxHeadRatio = genome.mass / 15000;
     if (genome.headSize > maxHeadRatio + 1.2) {
         genome.headSize = lerp(genome.headSize, maxHeadRatio + 1.2, 0.8);
     }
     if (genome.mass > 30000) {
-        genome.legLengthRaw *= 0.5; // Massive bodies shorten their own legs to support weight
+        genome.legLengthRaw *= 0.5; 
     }
     if (genome.bodyPlan === "Cephalopod") {
         genome.neckLengthRaw = 0;
@@ -292,7 +285,6 @@ function applyConstraints(genome) {
         genome.bodyLength = Math.max(genome.bodyLength, 2.5);
     }
 
-    // Finalize evaluated values
     genome.jawDepth = lerp(0.2, 1.5, genome.jawDepthRaw);
     genome.snoutLength = lerp(0.1, 2.8, genome.snoutLengthRaw);
     genome.neckLength = lerp(0, 2.5, genome.neckLengthRaw);
@@ -383,7 +375,6 @@ class TorsoArthropod extends CreatureModule {
         const headR = r * 1.15;
         this.primitives.push(new Ellipsoid(this.worldX, this.worldY, headR, headR * 0.85, 0, 'smooth_add', r * 0.1));
 
-        // insects keep a visible waist between thorax and abdomen; arachnids fuse the two into one mass
         const hasWaist = conf.segmentCount >= 3;
         if (hasWaist) {
             this.primitives.push(new Ellipsoid(this.worldX, this.worldY + r * 1.6, r * 0.5, r * 0.45, 0, 'smooth_add', r * 0.15));
@@ -438,7 +429,6 @@ class HeadModule extends CreatureModule {
         const craniumR = (10 + this.genome.bodyWidth * 22) * sizeScale * this.genome.headSize * this.genome.headWidth;
         const neckLen = (10 + this.genome.neckLength * 40) * sizeScale;
         
-        // moderated so extreme tilt values still leave a readable neck instead of folding the head in half
         const tilt = this.genome.headTilt * Math.PI * 0.6;
         const craniumX = this.worldX + Math.sin(tilt) * neckLen * 0.4;
         const craniumY = this.worldY - Math.cos(tilt) * neckLen;
@@ -465,7 +455,6 @@ class HeadModule extends CreatureModule {
         this.registerLocalSocket('eye_L', craniumX - this.worldX - socketX, eyeY - this.worldY, -1, 0);
         this.registerLocalSocket('mouth', snoutX - this.worldX, snoutY - this.worldY, 0, 1);
         
-        // Export head center required by rendering loop
         this.ctx.geometry.head.headCenter = { x: craniumX + Math.sin(tilt) * snoutL * 0.25, y: lerp(craniumY, snoutY, 0.4) };
         this.ctx.geometry.head.headR = craniumR * 1.1;
     }
@@ -477,18 +466,14 @@ class LimbModule extends CreatureModule {
         const genome = this.genome;
         const sizeScale = Math.pow(genome.mass / 5000, 0.3);
 
-        // subtle left/right length difference instead of perfectly mirrored limbs on every creature
         const asymmetryMod = 1 + this.side * genome.asymmetryBias * genome.asymmetry * 0.15;
         const legLenPx = (30 + genome.legLengthRaw * 60) * sizeScale * asymmetryMod;
 
         const dLen = Math.hypot(this.dirX, this.dirY) || 1;
         const ndx = this.dirX / dLen, ndy = this.dirY / dLen;
 
-        // radial/cephalopod limbs radiate straight out along the socket normal; everything else is a
-        // grounded leg that splays outward from the socket and then drops toward the ground
         const radiating = genome.bodyPlan === "Radial" || genome.bodyPlan === "Cephalopod";
 
-        // push the root out past the body surface first so smooth-blending doesn't swallow a thin limb
         const marginPx = (6 + genome.bodyWidth * 4) * sizeScale;
         const originX = this.worldX + ndx * marginPx;
         const originY = this.worldY + ndy * marginPx;
@@ -536,8 +521,6 @@ class LimbModule extends CreatureModule {
         }
 
         const baseDiam = (4 + genome.bodyWidth * 7) * Math.pow(genome.mass / 5000, 0.41);
-        // short stub bridging the true socket point to the pushed-out root, so the limb reads as one
-        // continuous shape instead of floating clear of the body
         this.primitives.push(new Capsule(this.worldX, this.worldY, originX, originY, baseDiam * 1.1, baseDiam, 'smooth_add', baseDiam * 0.3));
         for (let i = 0; i < chain.length - 1; i++) {
             const t1 = i / (chain.length - 1), t2 = (i + 1) / (chain.length - 1);
@@ -555,8 +538,6 @@ class TailModule extends CreatureModule {
         const segs = 3 + Math.round(genome.tailLength * 3);
         const segLen = 25 * genome.tailLength * sizeScale;
 
-        // start radius scales with the body the same way the torso does, so the tail reads as a
-        // continuation of the spine rather than a stub bolted onto the surface
         let px = this.worldX, py = this.worldY, pr = (8 + genome.bodyWidth * 10) * sizeScale;
         let angle = Math.PI / 2 + (this.rng() - 0.5) * 0.6;
 
@@ -569,7 +550,6 @@ class TailModule extends CreatureModule {
             px = nx; py = ny; pr = nr;
         }
 
-        // the final segment's shape depends on tail type instead of every tail tapering to the same point
         const t = (segs - 1) / segs;
         angle += (this.rng() - 0.5) * 0.5;
         const tipR = Math.max(2, pr * Math.pow(1 - t, 0.5));
@@ -608,7 +588,7 @@ class VertebrateGrammar {
         if (ctx.getSocket('tailBase')) torso.attach(tail, 'tailBase');
 
         const conf = BodyPlanConfigs[ctx.genome.bodyPlan] || BodyPlanConfigs.Vertebrate;
-        if (!conf.allowsLimbs) return; // e.g. Serpentine: spine + head + tail only, no limbs
+        if (!conf.allowsLimbs) return; 
 
         let pairs = Math.floor(ctx.genome.limbPairsRaw * 3) + 1;
         if (ctx.genome.bodyPlan === "Biped" || ctx.genome.bodyPlan === "Quadruped" || ctx.genome.bodyPlan === "Winged") pairs = 2;
@@ -616,7 +596,7 @@ class VertebrateGrammar {
 
         if (pairs >= 1) { torso.attach(new LimbModule(ctx, rng, -1), 'shoulder_L'); torso.attach(new LimbModule(ctx, rng, 1), 'shoulder_R'); }
         if (pairs >= 2 && ctx.genome.bodyPlan !== "Tripod") { torso.attach(new LimbModule(ctx, rng, -1), 'hip_L'); torso.attach(new LimbModule(ctx, rng, 1), 'hip_R'); }
-        else if (ctx.genome.bodyPlan === "Tripod") { torso.attach(new LimbModule(ctx, rng, 0), 'tailBase'); } // middle hop leg
+        else if (ctx.genome.bodyPlan === "Tripod") { torso.attach(new LimbModule(ctx, rng, 0), 'tailBase'); } 
         if (pairs >= 3) { torso.attach(new LimbModule(ctx, rng, -1), 'mid_L'); torso.attach(new LimbModule(ctx, rng, 1), 'mid_R'); }
     }
 }
@@ -628,7 +608,6 @@ class ArthropodGrammar {
         const head = new HeadModule(ctx, rng);
         torso.attach(head, 'neck');
 
-        // insects always get exactly 3 leg pairs (6 legs); arachnids get 4 pairs (8 legs)
         torso.attach(new LimbModule(ctx, rng, -1), 'shoulder_L'); torso.attach(new LimbModule(ctx, rng, 1), 'shoulder_R');
         torso.attach(new LimbModule(ctx, rng, -1), 'mid_L'); torso.attach(new LimbModule(ctx, rng, 1), 'mid_R');
         torso.attach(new LimbModule(ctx, rng, -1), 'hip_L'); torso.attach(new LimbModule(ctx, rng, 1), 'hip_R');
@@ -693,8 +672,7 @@ class EyeGenerator {
                 if (sock) {
                     const side = socketName === 'eye_L' ? -1 : 1;
                     const eR = baseER * (1 + side * genome.asymmetryBias * genome.asymmetry * 0.25);
-                    const pos = ctx.sampleBoundary(sock.x, sock.y, sock.dirX, sock.dirY);
-                    eyes.push({ x: pos.x, y: pos.y, radius: eR });
+                    eyes.push({ x: sock.x - sock.dirX * eR * 0.2, y: sock.y - sock.dirY * eR * 0.2, radius: eR });
                 }
             });
         }
@@ -737,6 +715,13 @@ function fitToBounds(ctx, targetW, targetH, padding) {
         minY = Math.min(minY, b.minY); maxY = Math.max(maxY, b.maxY);
     }
     
+    for (let e of ctx.geometry.eyePositions) {
+        minX = Math.min(minX, e.x - e.radius);
+        maxX = Math.max(maxX, e.x + e.radius);
+        minY = Math.min(minY, e.y - e.radius);
+        maxY = Math.max(maxY, e.y + e.radius);
+    }
+    
     const w = maxX - minX, h = maxY - minY;
     const scale = Math.min((targetW - padding * 2) / (w || 1), (targetH - padding * 2) / (h || 1));
     const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
@@ -745,9 +730,15 @@ function fitToBounds(ctx, targetW, targetH, padding) {
     for (let p of ctx.geometry.allBones) { p.translate(dx, dy); p.scale(scale); }
     for (let e of ctx.geometry.eyePositions) { e.x = e.x * scale + dx; e.y = e.y * scale + dy; e.radius *= scale; }
     
-    ctx.geometry.head.headCenter.x = ctx.geometry.head.headCenter.x * scale + dx;
-    ctx.geometry.head.headCenter.y = ctx.geometry.head.headCenter.y * scale + dy;
-    ctx.geometry.head.headR *= scale;
+    if (ctx.geometry.head.headCenter) {
+        ctx.geometry.head.headCenter.x = ctx.geometry.head.headCenter.x * scale + dx;
+        ctx.geometry.head.headCenter.y = ctx.geometry.head.headCenter.y * scale + dy;
+        ctx.geometry.head.headR *= scale;
+    }
+
+    if (ctx.materials && ctx.materials.patternScaleMultiplier) {
+        ctx.materials.patternScaleMultiplier /= scale;
+    }
 }
 
 function classifyCreature(genome) {
