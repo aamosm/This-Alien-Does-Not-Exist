@@ -2,7 +2,7 @@
 
 # This Alien Does Not Exist
 
-A procedural alien generator with <abbr title="4,294,967,296 unique deterministic aliens (2³² seeds)">Infinite</abbr> unique aliens.
+A procedural alien generator with Infinite<sup>4,294,967,296 </sup> unique aliens.
 
 **Live:** https://thisaliendoesnotexist.app/  
 **Devlog:** https://stardance.hackclub.com/projects/29187
@@ -26,12 +26,12 @@ The project explores how complex creatures can emerge entirely from deterministi
 ## Features
 
 - Deterministic generation
-- <abbr title="4,294,967,296 unique deterministic aliens (2³² seeds)">Infinite</abbr> unique creatures
+- 4,294,967,296 (2³² seeds) unique creatures
 - Permanent, shareable URL for every creature
 - Procedurally generated anatomy and biological traits
 - Browser-based renderer
 - No AI or stored assets
-- There is an Easter Egg in there... something related to the <abbr title="It can only generate (2³² - 1) in reality">Mulberry32 limitations</abbr>
+- There is an Easter Egg in there... something related to the Mulberry32 limitations<sup>It can only generate (2³² - 1) in reality</sup>
 
 **Exactly 4,294,967,296** unique deterministic aliens can be generated.
 
