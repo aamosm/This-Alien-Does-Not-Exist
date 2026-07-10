@@ -40,14 +40,14 @@ The project explores how complex creatures can emerge entirely from deterministi
 ## Example
 
 ```text
-Seed
-000481729513
+Seed (My current fav)
+0806318074
 ```
 
 ↓
 
 ```text
-https://thisaliendoesnotexist.app/000481729513
+https://thisaliendoesnotexist.app/0806318074
 ```
 
 Opening that URL will always generate the exact same alien.
