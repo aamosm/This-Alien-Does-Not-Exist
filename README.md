@@ -128,9 +128,3 @@ http://localhost:8000
 - Improved head and eye generation
 - More anatomical variation
 - Planet and ecosystem generation
-
----
-
-## License
-
-MIT
