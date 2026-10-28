@@ -1,136 +1,73 @@
-<div align="center">
+<h1 align="center">This Alien Doesn't Exist</h1>
+<p align="center">A procedural alien generator with deterministic seeds and trait-based search.</p>
+<p align="center"><a href="https://thisaliendoesnotexist.app">Website</a> · <a href="https://github.com/aamosm/This-Alien-Does-Not-Exist">Source</a></p>
 
-# This Alien Does Not Exist
+![The generator interface and observation panel](docs/images/site.png)
 
-A procedural alien generator with Infinite<sup>4,294,967,296 </sup> unique aliens.
+Generate an alien from a seed, revisit it later, or search for traits. Everything runs in the browser; no account or external model is needed.
 
-**Live:** https://thisaliendoesnotexist.app/  
-**Devlog:** https://stardance.hackclub.com/projects/29187
+## Run
 
-</div>
-
----
-
-## About
-
-This Alien Does Not Exist generates alien creatures entirely from a numerical seed.
-
-There are **no pre-made models, stored creatures, or AI-generated images**. Every alien is generated from scratch from its seed.
-
-The same seed always generates the same alien, giving every creature a permanent, shareable URL that anyone can revisit.
-
-The project explores how complex creatures can emerge entirely from deterministic procedural generation.
-
----
-
-## Features
-
-- Deterministic generation
-- 4,294,967,296 (2³² seeds) unique creatures and one more
-- Permanent, shareable URL for every creature
-- Procedurally generated anatomy and biological traits
-- Browser-based renderer
-- No AI or stored assets
-- There is an Easter Egg in there... something related to the Mulberry32 limitations<sup>If begun with 0 it only goes upto (2³² - 1)</sup>
-
-**Exactly 4,294,967,296** unique deterministic aliens can be generated.
-
----
-
-## Example
-
-```text
-Seed (My current fav)
-0806318074
-```
-
-↓
-
-```text
-https://thisaliendoesnotexist.app/0806318074
-```
-
-Opening that URL will always generate the exact same alien.
-
----
-
-## How it Works
-
-```text
-Seed
-   ↓
-Genome
-   ↓
-Morphology
-   ↓
-Procedural Rendering
-   ↓
-Alien
-```
-
-Each generated genome determines characteristics such as:
-
-- Body plan
-- Body mass
-- Body proportions
-- Limb count
-- Limb length
-- Head size
-- Neck length
-- Tail type
-- Eye count
-- Horn count
-- Skin colour
-- Behavioural traits
-
-These values are combined to construct and render the final creature entirely from procedural geometry.
-
----
-
-## Technologies
-
-- JavaScript
-- HTML5 Canvas
-- Mulberry32 PRNG
-- Signed Distance Fields (SDF)
-- FABRIK Inverse Kinematics
-- Procedural Value Noise
-
----
-
-## Running Locally
-
-Clone the repository:
+Open `index.html` for offline use. For the local server, JSON endpoints and CLI, install Node.js 22 or later and run:
 
 ```bash
-git clone https://github.com/aamosm/This-Alien-Does-Not-Exist.git
-cd This-Alien-Does-Not-Exist
+npm start
 ```
 
-Start a local server:
+**Quick** is the lightweight renderer; **Skin** adds surface detail and lighting.
+
+## Search
+
+Use **Search & filters** to combine traits, for example:
+
+1. Eyes → Exactly → `4`
+2. Skin pattern → Is → `Spots`
+3. Colour → About → `120`
+
+Select **Find matches**. Results show which traits matched. Some combinations of geometric constraints can only return an approximate match.
+
+![Trait search with examples and results](docs/images/search.png)
+
+**Start from the alien on screen** finds related creatures. Search links can be shared; the JSON editor accepts the API query format.
+
+Search builds genomes from the requested traits rather than scanning random seeds. See [REVERSE.md](docs/REVERSE.md) for the method and its limits.
+
+## Seeds and saves
+
+A creature's identity is `generatorVersion + seed`. `?v=2&seed=42` opens the current generator; `?v=1&seed=42` opens the original mapping.
+
+The **Save…** menu exports PNG or JSON for the current creature, or JSONL for saved discoveries. Imports support JSON and JSONL. Browser storage is optional; export discoveries before clearing browser data.
+
+## JavaScript API
+
+`alien-api.js` is a dependency-free ES module:
+
+```js
+import { generate, search, closest } from './alien-api.js';
+
+const alien = generate('42', { generatorVersion: 2 });
+const matches = await search({
+  constraints: [{ field: 'eyeCount', op: 'eq', value: 4 }],
+  limit: 6
+});
+const relatives = await closest(alien.identity.seed, { category: 'anatomy' });
+```
+
+See [API.md](docs/API.md) for query fields, responses and server routes. GitHub Pages supports the module and browser-based `api.html` bridge, but cannot run the Node HTTP endpoints.
+
+## Develop
 
 ```bash
-python -m http.server
+npm ci
+npx playwright install chromium
+npm run build
+npm test
+npm run test:browser
+npm run audit
 ```
 
-Open:
-
-```text
-http://localhost:8000
-```
-
----
-
-## Roadmap
-
-- Better depth and occlusion
-- More body plans
-- Improved head and eye generation
-- More anatomical variation
-- Planet and ecosystem generation
-
----
+`npm run package` creates `dist/This-Alien-Does-Not-Exist.zip`. Publish `index.html`, `404.html`, `.nojekyll`, `alien-api.js`, `api.html` and `LICENSE` for GitHub Pages. Keep `CNAME` only for the custom domain.
 
 ## License
 
-MIT
+[MIT](LICENSE), retaining `Copyright (c) 2026 DHC`.

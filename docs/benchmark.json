@@ -1,0 +1,296 @@
+{
+  "size": 512,
+  "repeats": 5,
+  "generation": {
+    "medianMs": 0.900000000372529,
+    "p95Ms": 1.8000000002793968,
+    "samples": 1000
+  },
+  "quick": [
+    {
+      "seed": "0",
+      "bodyPlan": "Spindle",
+      "draw": {
+        "medianMs": 0.19999999972060323,
+        "p95Ms": 0.20000000018626451,
+        "samples": 5
+      },
+      "drawAndReadback": {
+        "medianMs": 1.900000000372529,
+        "p95Ms": 2,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "1",
+      "bodyPlan": "Pear",
+      "draw": {
+        "medianMs": 2.5,
+        "p95Ms": 3.5,
+        "samples": 5
+      },
+      "drawAndReadback": {
+        "medianMs": 4.899999999906868,
+        "p95Ms": 6.600000000093132,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "2",
+      "bodyPlan": "Keel",
+      "draw": {
+        "medianMs": 2.6000000000931323,
+        "p95Ms": 3.7000000001862645,
+        "samples": 5
+      },
+      "drawAndReadback": {
+        "medianMs": 6.7000000001862645,
+        "p95Ms": 7.7000000001862645,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "4",
+      "bodyPlan": "Saddle",
+      "draw": {
+        "medianMs": 2.7000000001862645,
+        "p95Ms": 2.8999999999068677,
+        "samples": 5
+      },
+      "drawAndReadback": {
+        "medianMs": 6.2999999998137355,
+        "p95Ms": 6.5,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "5",
+      "bodyPlan": "Chevron",
+      "draw": {
+        "medianMs": 2.7000000001862645,
+        "p95Ms": 6.399999999906868,
+        "samples": 5
+      },
+      "drawAndReadback": {
+        "medianMs": 7.7000000001862645,
+        "p95Ms": 13.799999999813735,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "10",
+      "bodyPlan": "Folded",
+      "draw": {
+        "medianMs": 2.2000000001862645,
+        "p95Ms": 2.5,
+        "samples": 5
+      },
+      "drawAndReadback": {
+        "medianMs": 5.399999999906868,
+        "p95Ms": 5.7000000001862645,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "12",
+      "bodyPlan": "Undulating",
+      "draw": {
+        "medianMs": 2.1000000000931323,
+        "p95Ms": 2.8999999999068677,
+        "samples": 5
+      },
+      "drawAndReadback": {
+        "medianMs": 4.7000000001862645,
+        "p95Ms": 5.600000000093132,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "15",
+      "bodyPlan": "Waisted",
+      "draw": {
+        "medianMs": 3.1999999997206032,
+        "p95Ms": 3.3000000002793968,
+        "samples": 5
+      },
+      "drawAndReadback": {
+        "medianMs": 7.7999999998137355,
+        "p95Ms": 10.799999999813735,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "19",
+      "bodyPlan": "Arched",
+      "draw": {
+        "medianMs": 2.3999999999068677,
+        "p95Ms": 3.2999999998137355,
+        "samples": 5
+      },
+      "drawAndReadback": {
+        "medianMs": 6.100000000093132,
+        "p95Ms": 7.100000000093132,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "24",
+      "bodyPlan": "Tapered",
+      "draw": {
+        "medianMs": 3.2999999998137355,
+        "p95Ms": 6,
+        "samples": 5
+      },
+      "drawAndReadback": {
+        "medianMs": 6.100000000093132,
+        "p95Ms": 9.400000000372529,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "28",
+      "bodyPlan": "Bean",
+      "draw": {
+        "medianMs": 3,
+        "p95Ms": 4,
+        "samples": 5
+      },
+      "drawAndReadback": {
+        "medianMs": 7.2999999998137355,
+        "p95Ms": 9,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "29",
+      "bodyPlan": "Crescent",
+      "draw": {
+        "medianMs": 3.2000000001862645,
+        "p95Ms": 3.3000000002793968,
+        "samples": 5
+      },
+      "drawAndReadback": {
+        "medianMs": 6.5,
+        "p95Ms": 6.699999999720603,
+        "samples": 5
+      }
+    }
+  ],
+  "skin": [
+    {
+      "seed": "0",
+      "bodyPlan": "Spindle",
+      "drawAndReadback": {
+        "medianMs": 227.5,
+        "p95Ms": 317.89999999990687,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "1",
+      "bodyPlan": "Pear",
+      "drawAndReadback": {
+        "medianMs": 97.5,
+        "p95Ms": 124,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "2",
+      "bodyPlan": "Keel",
+      "drawAndReadback": {
+        "medianMs": 187.60000000009313,
+        "p95Ms": 194.10000000009313,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "4",
+      "bodyPlan": "Saddle",
+      "drawAndReadback": {
+        "medianMs": 123.39999999990687,
+        "p95Ms": 131.20000000018626,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "5",
+      "bodyPlan": "Chevron",
+      "drawAndReadback": {
+        "medianMs": 195.70000000018626,
+        "p95Ms": 240.60000000009313,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "10",
+      "bodyPlan": "Folded",
+      "drawAndReadback": {
+        "medianMs": 109.59999999962747,
+        "p95Ms": 117.20000000018626,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "12",
+      "bodyPlan": "Undulating",
+      "drawAndReadback": {
+        "medianMs": 94.5,
+        "p95Ms": 97.5,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "15",
+      "bodyPlan": "Waisted",
+      "drawAndReadback": {
+        "medianMs": 147.60000000009313,
+        "p95Ms": 149.60000000009313,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "19",
+      "bodyPlan": "Arched",
+      "drawAndReadback": {
+        "medianMs": 112.5,
+        "p95Ms": 116.29999999981374,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "24",
+      "bodyPlan": "Tapered",
+      "drawAndReadback": {
+        "medianMs": 148.79999999981374,
+        "p95Ms": 159.60000000009313,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "28",
+      "bodyPlan": "Bean",
+      "drawAndReadback": {
+        "medianMs": 111.90000000037253,
+        "p95Ms": 113.70000000018626,
+        "samples": 5
+      }
+    },
+    {
+      "seed": "29",
+      "bodyPlan": "Crescent",
+      "drawAndReadback": {
+        "medianMs": 106.39999999990687,
+        "p95Ms": 112.60000000009313,
+        "samples": 5
+      }
+    }
+  ],
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.186 Safari/537.36",
+  "runtime": {
+    "node": "v24.22.1",
+    "platform": "linux",
+    "architecture": "x64"
+  },
+  "method": "Headless Chromium; same twelve specimens and resolution in both styles. One warmup and repeated draws with synchronous pixel readback. Skin timing includes cooperative yielding. Worker startup, transfer, network and screen presentation are excluded. These are renderer timings, not phone benchmarks or animation frame rates."
+}

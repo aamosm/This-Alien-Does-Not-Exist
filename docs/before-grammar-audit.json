@@ -1,0 +1,24 @@
+{
+  "count": 2000,
+  "schedule": "mix64(index + 1024)",
+  "plans": {
+    "Insectoid": 214,
+    "Winged": 223,
+    "Serpentine": 233,
+    "Quadruped": 236,
+    "Tripod": 229,
+    "Arachnoid": 219,
+    "Cephalopod": 207,
+    "Radial": 207,
+    "Biped": 232
+  },
+  "radial4": 51,
+  "wings": 223,
+  "clamps": {
+    "supportMin": 78,
+    "supportMax": 5,
+    "radialHead": 76,
+    "eyeReduction": 447
+  },
+  "diagnosis": "Radial uses a circular torso and exact i*2*pi/limbCount roots. Four appendages form cardinal axes. Winged is one of nine equally weighted plans. Radial head and support hard clamps create endpoint piles."
+}

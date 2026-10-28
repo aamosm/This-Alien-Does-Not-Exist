@@ -1,0 +1,1170 @@
+{
+  "generatorVersions": [
+    1,
+    2
+  ],
+  "defaultGeneratorVersion": 2,
+  "seed": {
+    "type": "decimal string",
+    "maxDigits": 1000
+  },
+  "operators": [
+    "eq",
+    "near",
+    "min",
+    "max"
+  ],
+  "fields": {
+    "bodyPlan": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Body module",
+      "units": "",
+      "options": [
+        "Spindle",
+        "Pear",
+        "Keel",
+        "Crescent",
+        "Saddle",
+        "Chevron",
+        "Bean",
+        "Tapered",
+        "Waisted",
+        "Arched",
+        "Folded",
+        "Undulating"
+      ],
+      "gene": "body",
+      "formula": "inverse cumulative interval"
+    },
+    "headModule": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Head module",
+      "units": "",
+      "options": [
+        "Wedge",
+        "Brow",
+        "Muzzle",
+        "Shield",
+        "Narrow",
+        "Pendant",
+        "Broad",
+        "Tilted",
+        "Hammer",
+        "Scoop",
+        "Long",
+        "Offset"
+      ],
+      "gene": "head",
+      "formula": "inverse cumulative interval"
+    },
+    "limbSet": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Limb arrangement",
+      "units": "",
+      "options": [
+        "Low sweep",
+        "High sweep",
+        "Staggered",
+        "Trailing",
+        "Forward reach",
+        "Crouched",
+        "Splayed",
+        "Tucked",
+        "Offset",
+        "Raised",
+        "Long stride",
+        "Folded"
+      ],
+      "gene": "limbSet",
+      "formula": "inverse cumulative interval"
+    },
+    "symmetry": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Symmetry",
+      "units": "",
+      "options": [
+        "Bilateral",
+        "Partial",
+        "None",
+        "Radial"
+      ],
+      "gene": "symmetry",
+      "formula": "inverse cumulative interval"
+    },
+    "limbShape": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Limb shape",
+      "units": "",
+      "options": [
+        "Curved",
+        "Segmented",
+        "Tapering",
+        "Flattened"
+      ],
+      "gene": "limbShape",
+      "formula": "inverse cumulative interval"
+    },
+    "segmentCount": {
+      "type": "number",
+      "range": [
+        0,
+        12
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Body segments",
+      "units": "Whole number",
+      "options": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "gene": "segments",
+      "formula": "inverse cumulative interval"
+    },
+    "limbCount": {
+      "type": "number",
+      "range": [
+        0,
+        9
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Limbs (excluding wings)",
+      "units": "Whole number",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "legCount": {
+      "type": "number",
+      "range": [
+        0,
+        9
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Walking legs",
+      "units": "Whole number",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "wingCount": {
+      "type": "number",
+      "range": [
+        0,
+        9
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Wings",
+      "units": "Whole number",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "eyeCount": {
+      "type": "number",
+      "range": [
+        0,
+        11
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Eyes",
+      "units": "Whole number",
+      "options": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "gene": "eyeCount",
+      "formula": "inverse cumulative interval"
+    },
+    "eyeStyle": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Eye arrangement",
+      "units": "",
+      "options": [
+        "None",
+        "Central",
+        "Arc",
+        "Crown",
+        "Diagonal",
+        "Staggered",
+        "Bilateral",
+        "Uneven",
+        "Low arc",
+        "High arc",
+        "Spiral",
+        "Cluster",
+        "Offset pair",
+        "Split row"
+      ],
+      "gene": "eyeStyle",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "pupil": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Pupil shape",
+      "units": "",
+      "options": [
+        "None",
+        "round",
+        "slit",
+        "horizontal",
+        "star",
+        "diamond",
+        "oval",
+        "crescent",
+        "double",
+        "triangle",
+        "square",
+        "ring",
+        "pinpoint"
+      ],
+      "gene": "pupil",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "eyeSizeVariation": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Eye size difference",
+      "units": "0–1 scale",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "mouth": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Mouth",
+      "units": "",
+      "options": [
+        "Jaw",
+        "Filter",
+        "Beak",
+        "Mandibles",
+        "Proboscis",
+        "Pucker",
+        "Slit",
+        "Rosette",
+        "Cleft",
+        "Tube",
+        "Gills",
+        "Plate"
+      ],
+      "gene": "mouth",
+      "formula": "inverse cumulative interval"
+    },
+    "tailPresent": {
+      "type": "boolean",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Has a tail",
+      "units": "",
+      "options": [
+        false,
+        true
+      ],
+      "gene": "tail",
+      "formula": "inverse cumulative interval"
+    },
+    "tailType": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Tail shape",
+      "units": "",
+      "options": [
+        "None",
+        "Curved"
+      ],
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "tailBodyRatio": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Tail / body length",
+      "units": "Ratio: 0.5 means half; 1 means equal",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "limbBodyRatio": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Appendage / body length",
+      "units": "Ratio: 0.5 means half; 1 means equal",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "limbThicknessRatio": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Appendage thickness / body width",
+      "units": "Ratio: 0.5 means half; 1 means equal",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "headBodyRatio": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Head / body length",
+      "units": "Ratio: 0.5 means half; 1 means equal",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "neckBodyRatio": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Neck / body length",
+      "units": "Ratio: 0.5 means half; 1 means equal",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "bodyAspect": {
+      "type": "number",
+      "range": [
+        0,
+        8
+      ],
+      "group": "appearance",
+      "inverse": "derived",
+      "label": "Overall height / width",
+      "units": "Ratio: 0.5 means half; 1 means equal",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "hornCount": {
+      "type": "number",
+      "range": [
+        0,
+        9
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Horns",
+      "units": "Whole number",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "brightness": {
+      "type": "number",
+      "range": [
+        0.4,
+        0.8
+      ],
+      "group": "appearance",
+      "inverse": "direct",
+      "label": "OKLCH lightness",
+      "units": "0.4–0.8 scale",
+      "gene": "lightness",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "hue": {
+      "type": "hue",
+      "range": [
+        0,
+        360
+      ],
+      "group": "appearance",
+      "inverse": "direct",
+      "label": "Colour (degrees)",
+      "units": "0° red · 120° green · 240° blue",
+      "gene": "hue",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "pattern": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "appearance",
+      "inverse": "direct",
+      "label": "Skin pattern",
+      "units": "",
+      "options": [
+        "Plain",
+        "Spots",
+        "Bands",
+        "Reticulate",
+        "Speckles",
+        "Mottled",
+        "Veins",
+        "Dashes",
+        "Scales",
+        "Rings",
+        "Striae",
+        "Islands"
+      ],
+      "gene": "surface",
+      "formula": "inverse cumulative interval"
+    },
+    "contrast": {
+      "type": "number",
+      "range": [
+        0,
+        0.65
+      ],
+      "group": "appearance",
+      "inverse": "derived",
+      "label": "Pattern contrast",
+      "units": "0–0.65 scale",
+      "gene": "contrast",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "diet": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "ecology",
+      "inverse": "direct",
+      "label": "Diet",
+      "units": "",
+      "options": [
+        "Carnivore",
+        "Herbivore",
+        "Omnivore",
+        "Filter feeder",
+        "Detritivore"
+      ],
+      "gene": "diet",
+      "formula": "inverse cumulative interval"
+    },
+    "medium": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "ecology",
+      "inverse": "derived",
+      "label": "Habitat",
+      "units": "",
+      "options": [
+        "Land",
+        "Water",
+        "Air"
+      ],
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "activity": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "ecology",
+      "inverse": "direct",
+      "label": "Active time",
+      "units": "",
+      "options": [
+        "Diurnal",
+        "Nocturnal",
+        "Crepuscular"
+      ],
+      "gene": "activity",
+      "formula": "inverse cumulative interval"
+    },
+    "strategy": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "ecology",
+      "inverse": "direct",
+      "label": "Feeding strategy",
+      "units": "",
+      "options": [
+        "Ambush",
+        "Roaming",
+        "Grazing",
+        "Suspension feeding"
+      ],
+      "gene": "strategy",
+      "formula": "inverse cumulative interval"
+    },
+    "exploration": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "ecology",
+      "inverse": "derived",
+      "label": "Exploration",
+      "units": "0–1 scale",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "caution": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "ecology",
+      "inverse": "direct",
+      "label": "Caution",
+      "units": "0–1 scale",
+      "gene": "caution",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "sociality": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "ecology",
+      "inverse": "direct",
+      "label": "Sociality",
+      "units": "0–1 scale",
+      "gene": "sociality",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "palette": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "appearance",
+      "inverse": "derived",
+      "label": "Colour space",
+      "units": "",
+      "options": [
+        "OKLCH"
+      ],
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "saturation": {
+      "type": "number",
+      "range": [
+        0.125,
+        0.8
+      ],
+      "group": "appearance",
+      "inverse": "direct",
+      "label": "Chroma (normalised)",
+      "units": "0.125–0.8 scale",
+      "gene": "chroma",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "ambientLight": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "ecology",
+      "inverse": "direct",
+      "label": "Environmental light",
+      "units": "0–1 scale",
+      "gene": "light",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "relativeGravity": {
+      "type": "number",
+      "range": [
+        0.45,
+        1.8
+      ],
+      "group": "ecology",
+      "inverse": "direct",
+      "label": "Relative gravity",
+      "units": "0.45–1.8 × reference gravity",
+      "gene": "gravity",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "moisture": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "ecology",
+      "inverse": "direct",
+      "label": "Moisture",
+      "units": "0–1 scale",
+      "gene": "moisture",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "cover": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "ecology",
+      "inverse": "direct",
+      "label": "Cover",
+      "units": "0–1 scale",
+      "gene": "cover",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "temperature": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "ecology",
+      "inverse": "direct",
+      "label": "Temperature",
+      "units": "0–1 scale",
+      "gene": "temperature",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "resources": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "ecology",
+      "inverse": "direct",
+      "label": "Resources",
+      "units": "0–1 scale",
+      "gene": "resources",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "circularity": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "appearance",
+      "inverse": "derived",
+      "label": "Silhouette circularity",
+      "units": "0–1 scale",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "radialVariance": {
+      "type": "number",
+      "range": [
+        0,
+        1
+      ],
+      "group": "appearance",
+      "inverse": "derived",
+      "label": "Boundary radial variance",
+      "units": "0–1 scale",
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "motif1": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "appearance",
+      "inverse": "direct",
+      "label": "First motif",
+      "units": "",
+      "options": [
+        "Dorsal ridge",
+        "Dorsal rosette",
+        "Dorsal dimple field",
+        "Dorsal raised seam",
+        "Dorsal lobe",
+        "Dorsal hatching",
+        "Dorsal plate",
+        "Dorsal marbling",
+        "Left flank ridge",
+        "Left flank rosette",
+        "Left flank dimple field",
+        "Left flank raised seam",
+        "Left flank lobe",
+        "Left flank hatching",
+        "Left flank plate",
+        "Left flank marbling",
+        "Right flank ridge",
+        "Right flank rosette",
+        "Right flank dimple field",
+        "Right flank raised seam",
+        "Right flank lobe",
+        "Right flank hatching",
+        "Right flank plate",
+        "Right flank marbling",
+        "Shoulder ridge",
+        "Shoulder rosette",
+        "Shoulder dimple field",
+        "Shoulder raised seam",
+        "Shoulder lobe",
+        "Shoulder hatching",
+        "Shoulder plate",
+        "Shoulder marbling",
+        "Forehead ridge",
+        "Forehead rosette",
+        "Forehead dimple field",
+        "Forehead raised seam",
+        "Forehead lobe",
+        "Forehead hatching",
+        "Forehead plate",
+        "Forehead marbling",
+        "Spinal ridge",
+        "Spinal rosette",
+        "Spinal dimple field",
+        "Spinal raised seam",
+        "Spinal lobe",
+        "Spinal hatching",
+        "Spinal plate",
+        "Spinal marbling",
+        "Hip ridge",
+        "Hip rosette",
+        "Hip dimple field",
+        "Hip raised seam",
+        "Hip lobe",
+        "Hip hatching",
+        "Hip plate",
+        "Hip marbling",
+        "Neck ridge",
+        "Neck rosette",
+        "Neck dimple field",
+        "Neck raised seam",
+        "Neck lobe",
+        "Neck hatching",
+        "Neck plate",
+        "Neck marbling",
+        "Cheek ridge",
+        "Cheek rosette",
+        "Cheek dimple field",
+        "Cheek raised seam",
+        "Cheek lobe",
+        "Cheek hatching",
+        "Cheek plate",
+        "Cheek marbling",
+        "Lower flank ridge",
+        "Lower flank rosette",
+        "Lower flank dimple field",
+        "Lower flank raised seam",
+        "Lower flank lobe",
+        "Lower flank hatching",
+        "Lower flank plate",
+        "Lower flank marbling",
+        "Upper flank ridge",
+        "Upper flank rosette",
+        "Upper flank dimple field",
+        "Upper flank raised seam",
+        "Upper flank lobe",
+        "Upper flank hatching",
+        "Upper flank plate",
+        "Upper flank marbling",
+        "Rump ridge",
+        "Rump rosette",
+        "Rump dimple field",
+        "Rump raised seam",
+        "Rump lobe",
+        "Rump hatching",
+        "Rump plate",
+        "Rump marbling"
+      ],
+      "gene": "motif1",
+      "formula": "inverse cumulative interval"
+    },
+    "motif2": {
+      "type": "category",
+      "range": [
+        0,
+        1
+      ],
+      "group": "appearance",
+      "inverse": "derived",
+      "label": "Second motif",
+      "units": "",
+      "options": [
+        "None",
+        "Dorsal ridge",
+        "Dorsal rosette",
+        "Dorsal dimple field",
+        "Dorsal raised seam",
+        "Dorsal lobe",
+        "Dorsal hatching",
+        "Dorsal plate",
+        "Dorsal marbling",
+        "Left flank ridge",
+        "Left flank rosette",
+        "Left flank dimple field",
+        "Left flank raised seam",
+        "Left flank lobe",
+        "Left flank hatching",
+        "Left flank plate",
+        "Left flank marbling",
+        "Right flank ridge",
+        "Right flank rosette",
+        "Right flank dimple field",
+        "Right flank raised seam",
+        "Right flank lobe",
+        "Right flank hatching",
+        "Right flank plate",
+        "Right flank marbling",
+        "Shoulder ridge",
+        "Shoulder rosette",
+        "Shoulder dimple field",
+        "Shoulder raised seam",
+        "Shoulder lobe",
+        "Shoulder hatching",
+        "Shoulder plate",
+        "Shoulder marbling",
+        "Forehead ridge",
+        "Forehead rosette",
+        "Forehead dimple field",
+        "Forehead raised seam",
+        "Forehead lobe",
+        "Forehead hatching",
+        "Forehead plate",
+        "Forehead marbling",
+        "Spinal ridge",
+        "Spinal rosette",
+        "Spinal dimple field",
+        "Spinal raised seam",
+        "Spinal lobe",
+        "Spinal hatching",
+        "Spinal plate",
+        "Spinal marbling",
+        "Hip ridge",
+        "Hip rosette",
+        "Hip dimple field",
+        "Hip raised seam",
+        "Hip lobe",
+        "Hip hatching",
+        "Hip plate",
+        "Hip marbling",
+        "Neck ridge",
+        "Neck rosette",
+        "Neck dimple field",
+        "Neck raised seam",
+        "Neck lobe",
+        "Neck hatching",
+        "Neck plate",
+        "Neck marbling",
+        "Cheek ridge",
+        "Cheek rosette",
+        "Cheek dimple field",
+        "Cheek raised seam",
+        "Cheek lobe",
+        "Cheek hatching",
+        "Cheek plate",
+        "Cheek marbling",
+        "Lower flank ridge",
+        "Lower flank rosette",
+        "Lower flank dimple field",
+        "Lower flank raised seam",
+        "Lower flank lobe",
+        "Lower flank hatching",
+        "Lower flank plate",
+        "Lower flank marbling",
+        "Upper flank ridge",
+        "Upper flank rosette",
+        "Upper flank dimple field",
+        "Upper flank raised seam",
+        "Upper flank lobe",
+        "Upper flank hatching",
+        "Upper flank plate",
+        "Upper flank marbling",
+        "Rump ridge",
+        "Rump rosette",
+        "Rump dimple field",
+        "Rump raised seam",
+        "Rump lobe",
+        "Rump hatching",
+        "Rump plate",
+        "Rump marbling"
+      ],
+      "formula": "conditional or derived; see reverse.js"
+    },
+    "motifCount": {
+      "type": "number",
+      "range": [
+        0,
+        9
+      ],
+      "group": "appearance",
+      "inverse": "direct",
+      "label": "Motif count",
+      "units": "Whole number",
+      "options": [
+        1,
+        2
+      ],
+      "gene": "motifCount",
+      "formula": "inverse cumulative interval"
+    },
+    "bodyLength": {
+      "type": "number",
+      "range": [
+        145,
+        300
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Body reference length",
+      "units": "Developmental model units",
+      "gene": "length",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "bodyWidth": {
+      "type": "number",
+      "range": [
+        20,
+        62
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Body reference width",
+      "units": "Developmental model units",
+      "gene": "width",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "headSize": {
+      "type": "number",
+      "range": [
+        12,
+        45
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Head reference radius",
+      "units": "Developmental model units",
+      "gene": "headSize",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "limbLength": {
+      "type": "number",
+      "range": [
+        35,
+        180
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Appendage reference length",
+      "units": "Developmental model units",
+      "gene": "limbLength",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "pose": {
+      "type": "number",
+      "range": [
+        -1,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Pose",
+      "units": "-1–1 scale",
+      "gene": "pose",
+      "formula": "x = min + (max-min) * digit/65535"
+    },
+    "wings": {
+      "type": "boolean",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Has wings",
+      "units": "",
+      "options": [
+        false,
+        true
+      ],
+      "gene": "wings",
+      "formula": "inverse cumulative interval"
+    },
+    "horns": {
+      "type": "boolean",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Has horns",
+      "units": "",
+      "options": [
+        false,
+        true
+      ],
+      "gene": "horns",
+      "formula": "inverse cumulative interval"
+    },
+    "tentacles": {
+      "type": "boolean",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Has tentacles",
+      "units": "",
+      "options": [
+        false,
+        true
+      ],
+      "gene": "tentacles",
+      "formula": "inverse cumulative interval"
+    },
+    "antennae": {
+      "type": "boolean",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Has antennae",
+      "units": "",
+      "options": [
+        false,
+        true
+      ],
+      "gene": "antennae",
+      "formula": "inverse cumulative interval"
+    },
+    "crest": {
+      "type": "boolean",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "direct",
+      "label": "Has a crest",
+      "units": "",
+      "options": [
+        false,
+        true
+      ],
+      "gene": "crest",
+      "formula": "inverse cumulative interval"
+    },
+    "extraLimbs": {
+      "type": "boolean",
+      "range": [
+        0,
+        1
+      ],
+      "group": "anatomy",
+      "inverse": "derived",
+      "label": "Has extra limbs",
+      "units": "",
+      "options": [
+        false,
+        true
+      ],
+      "gene": "extraLimbs",
+      "formula": "conditional or derived; see reverse.js"
+    }
+  },
+  "search": {
+    "limit": [
+      1,
+      12
+    ],
+    "categories": [
+      "traits",
+      "closest",
+      "anatomy",
+      "appearance",
+      "ecology"
+    ],
+    "samePhenotypeDefault": true,
+    "globallyClosest": false
+  }
+}
