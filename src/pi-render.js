@@ -40,64 +40,97 @@ export function pathSDF(x, y, t) {
 export function piRecord(seed, m) {
   const t = piProgress(m),
     fade = 1 - t;
-  const claims = [
-    {
-      id: "path-anatomy",
-      section: "Morphology",
-      kind: "Measured",
-      text: "Biped body; 4 limbs in an upright stance typical of human specimens.",
-      evidence: [{ path: "measurements.limbCount", value: 4 }],
-    },
-    {
-      id: "path-eyes",
-      section: "Morphology",
-      kind: "Measured",
-      text: "2 eyes in a paired forward-facing arrangement; round pupils.",
-      evidence: [{ path: "measurements.eyeCount", value: 2 }],
-    },
-    {
-      id: "path-mouth",
-      section: "Morphology",
-      kind: "Measured",
-      text: "Jaw feeding structure.",
-      evidence: [{ path: "measurements.mouth", value: "Jaw" }],
-    },
-    {
-      id: "path-tail",
-      section: "Morphology",
-      kind: "Measured",
-      text: "No tail is present.",
-      evidence: [{ path: "measurements.tailPresent", value: false }],
-    },
-    {
-      id: "path-surface",
-      section: "Surface",
-      kind: "Measured",
-      text: "Plain pigmentation across an unarmored surface.",
-      evidence: [{ path: "measurements.pattern", value: "Plain" }],
-    },
-    {
-      id: "path-feeding",
-      section: "Ecology",
-      kind: "Model",
-      text: "The ecological model assigns an omnivore feeding role and a foraging strategy.",
-      evidence: [{ path: "ecology.diet", value: "omnivore" }],
-    },
-    {
-      id: "path-activity",
-      section: "Ecology",
-      kind: "Model",
-      text: "Diurnal activity preference in a terrestrial environment.",
-      evidence: [{ path: "ecology.activity", value: "diurnal" }],
-    },
-    {
-      id: "path-caution",
-      section: "Behaviour",
-      kind: "Model",
-      text: "Caution is moderate; social tendency is group-oriented.",
-      evidence: [{ path: "behavior.sociality", value: "group-oriented" }],
-    },
-  ];
+  // Describe this specimen, never the mechanism or the seed sequence.
+  const claim = (id, section, text, field, value) => ({
+    id,
+    section,
+    kind: "Measured",
+    text,
+    evidence: [{ path: `measurements.${field}`, value }],
+  });
+  const claims =
+    t === 0
+      ? [
+          claim(
+            "anatomy",
+            "Morphology",
+            "Bilateral upright body; two upper limbs and two weight-bearing lower limbs.",
+            "limbCount",
+            4,
+          ),
+          claim(
+            "head",
+            "Morphology",
+            "Rounded head connected to the trunk by a narrow neck.",
+            "bodyPlan",
+            "Biped",
+          ),
+          claim(
+            "eyes",
+            "Morphology",
+            "Two forward-facing eyes in a paired arrangement; round pupils.",
+            "eyeCount",
+            2,
+          ),
+          claim(
+            "mouth",
+            "Morphology",
+            "A single oral opening below the eyes.",
+            "mouth",
+            "Jaw",
+          ),
+          claim(
+            "feet",
+            "Morphology",
+            "Lower limbs terminate in short, outward-projecting feet.",
+            "limbCount",
+            4,
+          ),
+          claim(
+            "surface",
+            "Surface",
+            "Plain, unarmored surface with fine texture and no conspicuous markings.",
+            "pattern",
+            "Plain",
+          ),
+          claim(
+            "tail",
+            "Morphology",
+            "No tail, wings, horns or antennae are present.",
+            "tailPresent",
+            false,
+          ),
+        ]
+      : [
+          claim(
+            "anatomy",
+            "Morphology",
+            "Bilateral outline with a rounded central region.",
+            "symmetry",
+            "Bilateral",
+          ),
+          claim(
+            "surface",
+            "Surface",
+            "Plain, unarmored surface; no conspicuous markings.",
+            "pattern",
+            "Plain",
+          ),
+          claim(
+            "eyes",
+            "Morphology",
+            "Two small, paired ocular marks.",
+            "eyeCount",
+            2,
+          ),
+          claim(
+            "mouth",
+            "Morphology",
+            "A small oral mark lies below the paired ocular marks.",
+            "mouth",
+            "Jaw",
+          ),
+        ];
   return {
     identity: { version: "v2", generatorVersion: 2, seed, pi: m },
     generatorVersion: 2,
@@ -110,7 +143,8 @@ export function piRecord(seed, m) {
       piDigits: m,
       eyeCount: t === 1 ? 0 : 2,
       limbCount: t === 1 ? 0 : 4,
-      bodyPlan: t === 0 ? "Biped" : t === 1 ? "Circle" : "Transition",
+      bodyPlan: t === 0 ? "Biped" : t === 1 ? "Circle" : "Rounded",
+      symmetry: "Bilateral",
       mouth: t === 1 ? null : "Jaw",
       tailPresent: false,
       pattern: "Plain",

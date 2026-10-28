@@ -164,7 +164,10 @@ test(
   async () => {
     const { page, context, errors } = await opened();
     await load(page, "3");
-    assert.match(await page.locator("#record-panel").innerText(), /human/);
+    assert.match(
+      await page.locator("#record-panel").innerText(),
+      /Bilateral upright body/,
+    );
     assert.equal(new URL(page.url()).searchParams.get("pi"), "1");
     assert.equal((await exported(page)).pi.m, 1);
     await load(page, piSeed(14));
@@ -507,3 +510,40 @@ test(
     }
   },
 );
+
+test("related results vary in anatomy and keep the hidden sequence out of the interface", async () => {
+  const { page, context, errors } = await opened(
+    origin + "/?seed=15746261765410291626",
+  );
+  await page.locator("#open-search").click();
+  await page.locator('[data-preset="similar"]').click();
+  assert(await page.locator("#same-phenotype").isChecked());
+  await runSearch(page);
+  const count = await page.locator("#results article").count();
+  assert(count >= 3);
+  const outlines = await page
+    .locator("#results canvas")
+    .evaluateAll((nodes) => nodes.map((c) => c.toDataURL()));
+  assert.equal(new Set(outlines).size, count);
+  assert.doesNotMatch(await page.locator("#results").innerText(), /100\.0%/);
+  await page.screenshot({ path: ".test-output/related-winged.png" });
+  await page.locator("#same-phenotype").uncheck();
+  await runSearch(page);
+  await page.screenshot({ path: ".test-output/related-broad.png" });
+  await page.locator("#close-search").click();
+  await load(page, "3");
+  assert.doesNotMatch(
+    await page.locator("#alienData").innerText(),
+    /transform|reconstruction|human specimens/i,
+  );
+  await page.screenshot({ path: ".test-output/human-observations.png" });
+  await page.locator("#open-search").click();
+  await page.locator('[data-preset="similar"]').click();
+  await runSearch(page);
+  assert.doesNotMatch(
+    await page.locator("#results").innerText(),
+    /pi path|step \d|sequence|transformation/i,
+  );
+  assert.equal(errors.length, 0);
+  await context.close();
+});

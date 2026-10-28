@@ -1,11 +1,11 @@
 import { randomSeed } from "./random.js";
 import { generate } from "./engine.js";
 import { piLength } from "./pi.js";
-import { silhouetteSignature } from "./silhouette.js";
+import { silhouetteCluster } from "./silhouette.js";
 export const signatureOf = (record) =>
   record.kind === "pi-path"
     ? "pi-path"
-    : silhouetteSignature(record.geometry, record.motifs ?? []);
+    : `outline:${silhouetteCluster(record.geometry)}`;
 export class DiscoveryPicker {
   constructor({ entropy = randomSeed, recent = [] } = {}) {
     this.entropy = entropy;

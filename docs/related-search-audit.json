@@ -1,0 +1,13 @@
+{
+  "sampleSize": 100,
+  "schedule": "reported winged seed plus mix64(4000..4098)",
+  "requestedPerSeed": 6,
+  "returned": 600,
+  "fewestMatches": 6,
+  "limitedQueries": 0,
+  "duplicatesSkipped": 33,
+  "minimumPairwiseOutlineDistance": 0.06158678685350833,
+  "threshold": 0.06,
+  "violations": 0,
+  "scope": "Each result compared with the starting specimen and all siblings; same phenotype retained. Finite regression sample, not a proof of perceptual uniqueness."
+}

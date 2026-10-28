@@ -15,7 +15,9 @@ import { parameters, TABLES, POOLS, MOTIFS } from "./grammar.js";
 import { DIRECT, FIELDS, LABELS, OPTIONS, COUNTS, UNITS } from "./traits.js";
 import { validateFilters, assessment, similarity } from "./registry.js";
 import { normalizeSeed, piLength, piSeed } from "./pi.js";
-import { mix64 } from "./random.js";
+import { mix64, hashKey } from "./random.js";
+import { outlineDistance } from "./geometry.js";
+export const MIN_OUTLINE_DISTANCE = 0.06;
 export {
   LABELS,
   OPTIONS,
@@ -519,7 +521,8 @@ export async function solveQuery(
     ])
       if (
         !cs.some((c) => c.field === field) &&
-        target.measurements[field] != null
+        target.measurements[field] != null &&
+        (!OPTIONS[field] || OPTIONS[field].includes(target.measurements[field]))
       ) {
         const candidate = [
           ...cs,
@@ -540,12 +543,17 @@ export async function solveQuery(
       elapsedMs: 0,
     };
   const results = [];
+  const outlines = target?.shapeSignature?.anatomy
+    ? [target.shapeSignature.anatomy]
+    : [];
+  const seedIDs = new Set(target ? [target.identity.seed] : []);
+  let duplicatesSkipped = 0;
   let evaluated = 0;
   const evaluate = (g) => {
     evaluated++;
     return generate(ordinarySeed(g));
   };
-  for (let i = 0; i < query.limit; i++) {
+  for (let i = 0; i < query.limit * 8 && results.length < query.limit; i++) {
     check();
     let g = decode(
         target && target.kind !== "pi-path"
@@ -554,26 +562,50 @@ export async function solveQuery(
       ),
       proof = {};
     if (target && target.kind !== "pi-path") {
+      // Deliberate genome-space variation, followed by constraint projection.
+      // Several proportions change together; texture and pose alone never count as a new result.
       const free = [
-        "bend",
-        "limbLength",
+        "length",
         "width",
-        "phase",
+        "bend",
+        "headSize",
         "headWidth",
+        "neck",
+        "limbLength",
+        "limbWidth",
+        "asymmetry",
         "taper",
-        "pose",
-        "detail",
-      ].filter((k) => !cs.some((c) => DIRECT[c.field]?.gene === k));
-      const key = free[(query.variant + i) % free.length];
-      if (key)
-        g.digits[key] = Math.max(
-          0,
-          Math.min(
-            65535,
-            g.digits[key] + (i % 2 ? -1 : 1) * (300 + 90 * Math.floor(i / 2)),
-          ),
+      ].filter(
+        (k) => !cs.some((c) => c.op === "eq" && DIRECT[c.field]?.gene === k),
+      );
+      const serial = query.variant * 101 + i;
+      for (let j = 0; j < Math.min(6, free.length); j++) {
+        const key = free[(serial + j) % free.length];
+        const entropy =
+          Number(mix64(hashKey(key) ^ BigInt(serial + 1)) >> 32n) / 4294967296;
+        const delta =
+          (0.16 + 0.28 * (entropy % 0.5) * 2) *
+          65535 *
+          (entropy < 0.5 ? -1 : 1);
+        const value = g.digits[key] + delta;
+        g.digits[key] = Math.round(
+          value < 0 ? -value : value > 65535 ? 131070 - value : value,
         );
-      else g.quotient = (BigInt(g.quotient) + BigInt(i + 1)).toString();
+      }
+      if (!query.samePhenotype) {
+        const key = ["body", "head", "limbSet", "limbShape"][serial % 4];
+        const options = TABLES[key].map(([, value]) => value);
+        const current = tableChoice(g.digits[key], TABLES[key]);
+        setChoice(
+          g,
+          key,
+          options[
+            (options.indexOf(current) + 1 + (serial % (options.length - 1))) %
+              options.length
+          ],
+          TABLES[key],
+        );
+      }
     }
     projectDirect(g, cs, proof);
     projectTopology(g, cs);
@@ -610,6 +642,20 @@ export async function solveQuery(
     const final = generate(best.identity.seed),
       evaluations = checks(final, query.constraints),
       allChecks = checks(final, cs);
+    const outline = final.shapeSignature?.anatomy;
+    if (
+      seedIDs.has(final.identity.seed) ||
+      (outline &&
+        outlines.some(
+          (v) => outlineDistance(v, outline) < MIN_OUTLINE_DISTANCE,
+        ))
+    ) {
+      duplicatesSkipped++;
+      await pause();
+      continue;
+    }
+    seedIDs.add(final.identity.seed);
+    if (outline) outlines.push(outline);
     results.push({
       record: catalogueRecord(final),
       checks: evaluations,
@@ -635,7 +681,7 @@ export async function solveQuery(
         : "trait match",
       proof,
     });
-    onProgress({ done: i + 1, total: query.limit });
+    onProgress({ done: results.length, total: query.limit });
     await pause();
   }
   check();
@@ -658,6 +704,7 @@ export async function solveQuery(
         comparison: similarity(target, nextRecord),
         category: "next pi path",
       });
+      results.length = Math.min(results.length, query.limit);
     }
   }
   return {
@@ -667,6 +714,11 @@ export async function solveQuery(
     results,
     conflicts: [],
     evaluated,
+    diversity: {
+      duplicatesSkipped,
+      minimumOutlineDistance: MIN_OUTLINE_DISTANCE,
+      limited: results.length < query.limit,
+    },
     elapsedMs: Math.round(performance.now() - started),
     guarantee:
       "Direct fields: inverse intervals in a bijective genome, with forward verification. Derived geometry: bounded local fit, not a global-nearest proof.",

@@ -14,7 +14,7 @@ Open `index.html` for offline use. For the local server, JSON endpoints and CLI,
 npm start
 ```
 
-**Quick** is the lightweight renderer; **Skin** adds surface detail and lighting.
+**Quick** is the lightweight renderer; **Skin** adds surface detail and lighting. Random discovery avoids the last ten silhouette clusters even when markings differ. Wing membranes vary in sweep, chord and tip shape instead of sharing a fixed quadrilateral. This update changes winged appearances at existing current-generator seeds; the original generator is unchanged.
 
 ## Search
 
@@ -28,7 +28,7 @@ Select **Find matches**. Results show which traits matched. Some combinations of
 
 ![Trait search with examples and results](docs/images/search.png)
 
-**Start from the alien on screen** finds related creatures. Search links can be shared; the JSON editor accepts the API query format.
+**Start from the alien on screen** finds visibly different relatives. **Keep the same body type** preserves the anatomy family; uncheck it to explore different body and head modules. The solver varies several proportions and compares outlines, so changing only paint or texture does not fill the results with copies. Restrictive filters can return fewer results. Search links can be shared; the JSON editor accepts the API query format.
 
 Search builds genomes from the requested traits rather than scanning random seeds. See [REVERSE.md](docs/REVERSE.md) for the method and its limits.
 

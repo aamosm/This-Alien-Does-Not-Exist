@@ -12,6 +12,8 @@ import { chromium } from "playwright";
 import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import assert from "node:assert/strict";
+import { Worker } from "node:worker_threads";
+import { availableParallelism } from "node:os";
 const count = 2000,
   records = [],
   vectors = [],
@@ -108,7 +110,7 @@ function cluster(k) {
 }
 console.log("Clustering 2,000 raster silhouettes…");
 const forty = cluster(40),
-  clusters = cluster(80);
+  clusters = cluster(96);
 if (process.argv.includes("--write-clusters")) {
   await writeFile(
     "src/silhouette-clusters.js",
@@ -119,7 +121,7 @@ if (process.argv.includes("--write-clusters")) {
       ";\n",
   );
   console.log(
-    "Wrote 80 fixed silhouette prototypes. Generation mapping is unchanged.",
+    "Wrote 96 fixed silhouette prototypes. Generation mapping is unchanged.",
   );
   process.exit(0);
 }
@@ -127,8 +129,8 @@ if (process.argv.includes("--clusters-only")) {
   console.log(
     JSON.stringify({
       k40: forty.largestFraction,
-      k80: clusters.largestFraction,
-      k96: cluster(96).largestFraction,
+      k80: cluster(80).largestFraction,
+      k96: clusters.largestFraction,
     }),
   );
   process.exit(0);
@@ -199,26 +201,32 @@ try {
 console.log("Simulating 10,000 independent sessions of 20 clicks…");
 const deployedCounts = new Array(clusters.k).fill(0);
 for (const r of records) deployedCounts[silhouetteCluster(r.geometry)]++;
-let repeat = 0,
-  resamples = 0,
-  exhaustions = 0,
-  serial = 10000n;
-for (let session = 0; session < 10000; session++) {
-  const picker = new DiscoveryPicker({
-      entropy: () => mix64(serial++).toString(),
-    }),
-    seen = [];
-  for (let click = 0; click < 20; click++) {
-    const r = picker.next(),
-      sig = signatureOf(r);
-    if (seen.includes(sig)) repeat++;
-    resamples += picker.lastAttempts - 1;
-    seen.push(sig);
-    if (seen.length > 10) seen.shift();
-  }
-  exhaustions += picker.exhausted;
-  if (session % 1000 === 999) console.log(`${session + 1} sessions complete`);
-}
+// Independent deterministic session ranges allow parallel verification without shared RNG state.
+const workerCount = Math.min(4, availableParallelism());
+const batches = await Promise.all(
+  Array.from({ length: workerCount }, (_, i) => {
+    const from = Math.floor((i * 10000) / workerCount);
+    const to = Math.floor(((i + 1) * 10000) / workerCount);
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(
+        new URL("./click-audit-worker.mjs", import.meta.url),
+        { workerData: { from, to } },
+      );
+      worker.on("message", (data) => {
+        if (data.finished) resolve(data);
+        else
+          console.log(`Session batch ${i + 1}: ${data.complete}/${to - from}`);
+      });
+      worker.on("error", reject);
+      worker.on("exit", (code) => {
+        if (code !== 0) reject(new Error(`Click audit worker exited ${code}`));
+      });
+    });
+  }),
+);
+const repeat = batches.reduce((s, r) => s + r.repeat, 0);
+const resamples = batches.reduce((s, r) => s + r.resamples, 0);
+const exhaustions = batches.reduce((s, r) => s + r.exhaustions, 0);
 const result = {
   count,
   schedule: "mix64(index + 1024)",
@@ -266,6 +274,10 @@ const result = {
     sessions: 10000,
     clicks: 200000,
     window: 10,
+    signature:
+      "silhouette cluster only; markings and motif names do not excuse a repeat",
+    schedule:
+      "session i draws mix64((i + 1) * 100000 + draw), up to 10 attempts per click",
     repeats: repeat,
     resamples,
     exhaustions,

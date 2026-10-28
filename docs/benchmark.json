@@ -292,5 +292,6 @@
     "platform": "linux",
     "architecture": "x64"
   },
-  "method": "Headless Chromium; same twelve specimens and resolution in both styles. One warmup and repeated draws with synchronous pixel readback. Skin timing includes cooperative yielding. Worker startup, transfer, network and screen presentation are excluded. These are renderer timings, not phone benchmarks or animation frame rates."
+  "method": "Headless Chromium; same twelve specimens and resolution in both styles. One warmup and repeated draws with synchronous pixel readback. Skin timing includes cooperative yielding. Worker startup, transfer, network and screen presentation are excluded. These are renderer timings, not phone benchmarks or animation frame rates.",
+  "scope": "Historical measurements from the supplied archive, before the outline-deduplication and wing update. Run npm run benchmark -- --out docs/benchmark.json to measure this revision."
 }

@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--out', type=Path, default=root / 'dist' / 'This-Alien-Does-Not-Exist.zip')
 args = parser.parse_args()
 files = ['alien-api.js', 'api.html', 'index.html', '404.html', 'styles.css', 'README.md', 'LICENSE', 'CNAME',
-         '.nojekyll', '.gitignore', 'package.json', 'package-lock.json', 'CHANGELOG.md']
+         '.nojekyll', '.gitattributes', '.gitignore', 'package.json', 'package-lock.json']
 for folder in ['src', 'legacy', 'scripts', 'tests', 'docs']:
     files.extend(str(p.relative_to(root)) for p in (root / folder).rglob('*')
                  if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc')

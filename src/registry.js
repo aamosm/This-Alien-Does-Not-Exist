@@ -1,5 +1,6 @@
 import { normalizeSeed, piLength, piProgress } from "./pi.js";
 import { FIELDS, OPTIONS } from "./traits.js";
+import { outlineDistance } from "./geometry.js";
 export { FIELDS };
 export const CATEGORY_OPTIONS = OPTIONS;
 export const recordID = (r) =>
@@ -110,7 +111,12 @@ export function similarity(
   )
     return null;
   if (a.kind === "pi-path" && b.kind === "pi-path")
-    return { score: 1 - Math.abs(a.pi.t - b.pi.t), terms: [], category: "pi-path" };
+    return {
+      score: 1 - Math.abs(a.pi.t - b.pi.t),
+      terms: [],
+      category: "pi-path",
+    };
+  if (a.kind === "pi-path" || b.kind === "pi-path") return null;
   let total = 0,
     sum = 0;
   const terms = [];
@@ -131,8 +137,22 @@ export function similarity(
   }
   if (!total) return null;
   const same = a.phenotype === b.phenotype;
+  const outlines = a.shapeSignature?.anatomy && b.shapeSignature?.anatomy;
+  const shapeDistance = outlines
+    ? Math.min(
+        1,
+        outlineDistance(a.shapeSignature.anatomy, b.shapeSignature.anatomy) / 2,
+      )
+    : null;
+  const traitScore = 1 - sum / total;
+  const shapeWeight = weights.anatomy > 0 && shapeDistance !== null ? 0.55 : 0;
   return {
-    score: (1 - sum / total) * (same ? 1 : 0.65),
+    score:
+      ((1 - shapeWeight) * traitScore +
+        shapeWeight * (1 - (shapeDistance ?? 0))) *
+      (same ? 1 : 0.65),
+    traitScore,
+    shapeDistance,
     terms,
     samePhenotype: same,
     category: same ? "same phenotype" : "different phenotype",

@@ -1,4 +1,15 @@
 import { clamp } from "./random.js";
+import { boundsOf, silhouetteVector } from "./silhouette.js";
+// Compare anatomy without letting markings or small decorative motifs disguise a clone.
+export function anatomyVector(geometry) {
+  const parts = geometry.parts.filter(
+    (p) => !p.role?.startsWith("motif") && p.role !== "surface-segment",
+  );
+  return silhouetteVector({ parts, bounds: boundsOf({ parts }) });
+}
+export function outlineDistance(a, b) {
+  return a.reduce((sum, v, i) => sum + (v - b[i]) ** 2, 0);
+}
 export function shapeSignature(geometry) {
   const b = geometry.bounds,
     cx = (b.minX + b.maxX) / 2,
@@ -28,5 +39,9 @@ export function shapeSignature(geometry) {
     }
     return clamp(support / scale);
   });
-  return { method: "support-envelope@1", values };
+  return {
+    method: "support-envelope@1",
+    values,
+    anatomy: anatomyVector(geometry),
+  };
 }

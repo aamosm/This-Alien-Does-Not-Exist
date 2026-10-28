@@ -432,27 +432,32 @@ export function geometryOf(p) {
   }
   if (p.wings)
     for (const side of [-1, 1]) {
-      const root = spine[5],
-        span = p.limbLength * 1.8;
-      polygon(
-        "wing-membrane",
-        [
-          root,
-          { x: root.x + side * span * 0.6, y: root.y - span * 0.8 },
-          { x: root.x + side * span, y: root.y - span * 0.25 },
-          { x: root.x + side * span * 0.7, y: root.y + span * 0.35 },
-        ],
-        -1,
-        "membrane",
-      );
+      const root = spine[5];
+      // Membrane sweep, chord, tip and scalloping vary continuously with anatomy.
+      // The former fixed quadrilateral made all winged silhouettes look alike.
+      const span =
+        p.limbLength * (1.2 + p.taper) * (1 + side * p.asymmetry * 0.25);
+      const chord = span * (0.16 + p.taper * 0.65);
+      const sweep = span * (p.bend * 0.75 - 0.15);
+      const local = [
+        [0, 0],
+        [span * 0.28, sweep * 0.2 - chord * 0.6],
+        [span * 0.64, sweep * 0.58 - chord * (0.45 + p.taper * 0.55)],
+        [span, sweep],
+        [span * 0.77, sweep * 0.77 + chord * 0.3],
+        [span * 0.61, sweep * 0.61 + chord * (0.5 + p.asymmetry)],
+        [span * 0.36, sweep * 0.36 + chord * 0.55],
+        [span * 0.13, chord * 0.3],
+      ];
+      const points = local.map(([x, y]) => ({
+        x: root.x + side * x,
+        y: root.y + y,
+      }));
+      polygon("wing-membrane", points, -1, "membrane");
       ribbon(
         "wing-edge",
-        [
-          root,
-          { x: root.x + side * span * 0.6, y: root.y - span * 0.8 },
-          { x: root.x + side * span, y: root.y - span * 0.25 },
-        ],
-        [p.limbWidth * 0.8, 3, 1],
+        points.slice(0, 4),
+        [p.limbWidth * 0.8, 2.6, 1.8, 0.6],
         0,
       );
     }

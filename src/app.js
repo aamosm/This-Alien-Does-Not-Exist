@@ -422,12 +422,13 @@ let machineQuery = null;
 function updateQuery() {
   machineQuery = null;
   const isLike = $("like-current").checked;
-  const matchCat = $("match-category-wrap") || $("match-category")?.closest("label");
+  const matchCat =
+    $("match-category-wrap") || $("match-category")?.closest("label");
   if (matchCat) matchCat.hidden = !isLike;
-  $("find-matches").disabled =
-    !$("filters").children.length && !isLike;
+  $("phenotype-wrap").hidden = !isLike || current?.kind === "pi-path";
+  $("find-matches").disabled = !$("filters").children.length && !isLike;
   $("like-description").textContent = isLike
-    ? "Keep unspecified inputs close to this alien; change the characteristics below."
+    ? "Find visibly different relatives. Uncheck ‘Keep the same body type’ for a wider range of anatomy."
     : "Unspecified traits can vary.";
 }
 function newFilter(initial = { field: "eyeCount", op: "eq", value: 4 }) {
@@ -534,6 +535,7 @@ function newFilter(initial = { field: "eyeCount", op: "eq", value: 4 }) {
 $("add-filter").addEventListener("click", () => newFilter());
 $("like-current").addEventListener("change", updateQuery);
 $("match-category").addEventListener("change", updateQuery);
+$("same-phenotype").addEventListener("change", updateQuery);
 $("open-search").addEventListener("click", () => {
   if (!$("filters").children.length) newFilter();
   $("search-dialog").showModal();
@@ -655,6 +657,7 @@ function currentQuery() {
       constraints: [...$("filters").children].map((row) => row.getFilter()),
       like: $("like-current").checked && current ? current.identity.seed : null,
       limit: 6,
+      samePhenotype: $("same-phenotype").checked,
       generatorVersion:
         $("like-current").checked && current ? current.generatorVersion : 2,
       category: $("like-current").checked
@@ -686,7 +689,7 @@ async function runSearch() {
       const card = el("article", undefined, "result"),
         thumb = el("canvas"),
         content = el("div"),
-        open = el("a", record.kind === "pi-path" ? "Open pi path" : "Open alien");
+        open = el("a", "Open alien");
       thumb.width = thumb.height = 140;
       thumb.setAttribute("aria-label", `${m.bodyPlan}, ${m.eyeCount} eyes`);
       if (record.kind === "pi-path")
@@ -698,16 +701,18 @@ async function runSearch() {
         el(
           "strong",
           record.kind === "pi-path"
-            ? `Next pi path (step ${record.pi.m} of 1000)`
+            ? "Related specimen"
             : item.exact
               ? "Matches your request"
               : "Closest found · some traits differ",
-          item.exact || record.kind === "pi-path" ? "match-label" : "approx-label",
+          item.exact || record.kind === "pi-path"
+            ? "match-label"
+            : "approx-label",
         ),
         el(
           "p",
           record.kind === "pi-path"
-            ? `Next pi path · ${m.bodyPlan}`
+            ? `${m.bodyPlan} · ${m.eyeCount} eyes`
             : `${m.bodyPlan} · ${m.eyeCount} eyes · ${m.pattern.toLowerCase()} skin`,
         ),
       );
@@ -728,17 +733,19 @@ async function runSearch() {
           el(
             "li",
             record.kind === "pi-path"
-              ? "Next pi path along the sequence."
-              : "Same phenotype; nearby developmental inputs.",
+              ? "Closest related specimen."
+              : item.category === "same phenotype"
+                ? "Same body type; different anatomical proportions."
+                : "Different body type; related traits.",
           ),
         );
       why.append(list);
       content.append(why);
-      if (item.comparison)
+      if (item.comparison && record.kind !== "pi-path")
         content.append(
           el(
             "p",
-            `${(item.comparison.score * 100).toFixed(1)}% measured resemblance`,
+            `${(item.comparison.score * 100).toFixed(1)}% ${query.category === "appearance" || query.category === "ecology" ? "trait similarity" : "shape & trait similarity"}`,
             "score",
           ),
         );
@@ -759,7 +766,7 @@ async function runSearch() {
     $("search-status").textContent =
       data.status === "conflict"
         ? data.conflicts.join(" ")
-        : `${data.results.filter((r) => r.exact).length} of ${data.results.length} constructed results match your request.${data.status === "approximate" ? " The closest found are shown below; a global closest match is not guaranteed." : ""}`;
+        : `${data.results.filter((r) => r.exact).length} of ${data.results.length} constructed results match your request.${data.status === "approximate" ? " The closest found are shown below; a global closest match is not guaranteed." : ""}${data.diversity?.limited ? " Near-identical outlines were omitted. Broaden the filters or uncheck Keep the same body type for more variety." : ""}`;
   } catch (error) {
     if (error.name !== "AbortError")
       $("search-status").textContent = error.message;
@@ -779,6 +786,7 @@ $("apply-query").addEventListener("click", () => {
     $("filters").replaceChildren();
     for (const c of query.constraints) newFilter(c);
     $("like-current").checked = query.like === current?.identity.seed;
+    $("same-phenotype").checked = query.samePhenotype;
     updateQuery();
     machineQuery = query;
     $("find-matches").disabled = false;
@@ -903,6 +911,9 @@ try {
     $("filters").replaceChildren();
     for (const c of query.constraints) newFilter(c);
     $("like-current").checked = !!query.like;
+    $("same-phenotype").checked = query.samePhenotype;
+    $("phenotype-wrap").hidden = !query.like || current?.kind === "pi-path";
+    $("match-category-wrap").hidden = !query.like;
     $("match-category").value =
       query.category === "traits" ? "closest" : query.category;
     machineQuery = query;

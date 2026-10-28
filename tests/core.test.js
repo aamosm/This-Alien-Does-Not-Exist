@@ -292,7 +292,7 @@ test("closest matches preserve phenotype; pi neighbours advance by prefix", asyn
   for (const x of r.results) {
     assert.equal(x.record.phenotype, target.phenotype);
     assert.notEqual(x.record.identity.seed, "42");
-    assert(x.comparison.score > 0.9);
+    assert(x.comparison.score > 0.75 && x.comparison.score < 0.99);
   }
   const pi = await solveQuery({ like: "3", limit: 3 });
   assert.deepEqual(
@@ -393,4 +393,90 @@ test("plain pigmentation has zero visible contrast and the endpoint has a closes
     (await solveQuery({ like: PI_DIGITS, limit: 1 })).results[0].record.pi.m,
     999,
   );
+});
+
+test("similarity returns distinct outlines, not texture-only copies of the reported winged specimen", async () => {
+  const { outlineDistance } = await import("../src/geometry.js");
+  const { MIN_OUTLINE_DISTANCE } = await import("../src/reverse.js");
+  for (const seed of ["15746261765410291626", "42", "17"]) {
+    const original = generate(seed);
+    const result = await solveQuery({ like: seed, limit: 6 });
+    assert(result.results.length >= 3);
+    const outlines = [original.shapeSignature.anatomy];
+    for (const item of result.results) {
+      assert.equal(item.record.phenotype, original.phenotype);
+      assert(item.comparison.score < 0.99);
+      for (const v of outlines)
+        assert(
+          outlineDistance(v, item.record.shapeSignature.anatomy) >=
+            MIN_OUTLINE_DISTANCE,
+        );
+      outlines.push(item.record.shapeSignature.anatomy);
+      assert.deepEqual(
+        item.record,
+        catalogueRecord(generate(item.record.identity.seed)),
+      );
+    }
+  }
+  const broad = await solveQuery({
+    like: "42",
+    samePhenotype: false,
+    limit: 6,
+  });
+  assert(
+    broad.results.some((r) => r.record.phenotype !== generate("42").phenotype),
+  );
+});
+
+test("tightly constrained searches omit clones and verify any remaining differences", async () => {
+  const seed = "42",
+    r = generate(seed);
+  const constraints = Object.entries(r.measurements)
+    .filter(([key]) => FIELDS[key])
+    .map(([field, value]) => ({ field, op: "eq", value }));
+  const found = await solveQuery({ like: seed, constraints, limit: 2 });
+  assert(found.diversity.duplicatesSkipped > 0);
+  const { outlineDistance } = await import("../src/geometry.js");
+  for (const item of found.results) {
+    assert(
+      outlineDistance(
+        r.shapeSignature.anatomy,
+        item.record.shapeSignature.anatomy,
+      ) >= 0.06,
+    );
+    assert.equal(
+      item.exact,
+      item.checks.every((c) => c.met),
+    );
+  }
+  assert.equal(found.diversity.limited, found.results.length < 2);
+});
+
+test("discovery ignores changed paint or motifs when the outline cluster repeats", () => {
+  const original = generate("42");
+  const repainted = {
+    ...original,
+    motifs: ["different motif"],
+    materials: { hue: 123 },
+  };
+  assert.equal(signatureOf(original), signatureOf(repainted));
+});
+
+test("human observations describe the specimen without revealing the hidden mechanism", () => {
+  const human = generate("3");
+  assert(human.claims.length >= 6);
+  assert.match(
+    human.claims.map((c) => c.text).join(" "),
+    /upper limbs.*lower limbs/,
+  );
+  for (const m of [1, 2, 14, 100, 999]) {
+    const text = generate(piSeed(m))
+      .claims.map((c) => c.text)
+      .join(" ");
+    assert.doesNotMatch(
+      text,
+      /transform|reconstruct|sequence|pi path|fade|original|human specimens|model assigns/i,
+    );
+  }
+  assert.deepEqual(generate("circle").claims, []);
 });

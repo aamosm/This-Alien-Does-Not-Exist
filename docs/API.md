@@ -54,3 +54,5 @@ With `npm start`, the Node server exposes:
 Requests support GET and HEAD. Invalid requests return HTTP 400; seeds above the supported ceiling return HTTP 422. The server does not save generated records to the browser catalogue.
 
 Static hosts such as GitHub Pages cannot run these HTTP routes. Use the ES module directly or embed `api.html` and send it `postMessage` requests with `type: 'alien:request'`, an `id`, and a `request` object containing `op` and its arguments. Responses use `type: 'alien:response'` and the same ID. Fetching `api.html` alone returns HTML, not computed JSON.
+
+Related searches accept `samePhenotype: false` to broaden structural modules. Ordinary search results suppress near-identical outlines, so `limit` is a maximum rather than a guaranteed count. The `diversity` object reports `duplicatesSkipped`, `minimumOutlineDistance` and `limited`. Current records include a normalized anatomy descriptor in `shapeSignature.anatomy`; imported records are regenerated before use.

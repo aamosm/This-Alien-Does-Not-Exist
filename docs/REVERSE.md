@@ -21,3 +21,13 @@ Scalar constraints become intervals over genome digits. Categorical constraints 
 Every result is regenerated through the forward generator and checked against the requested values. Contradictory constraints can return no result; unrepresentable or coupled measurements can return an approximate result. The solver does not guarantee the globally closest result for derived geometry.
 
 `schema().fields` lists supported measurable traits and identifies direct versus derived inversion. A complete genome can be encoded and decoded exactly, but arbitrary combinations of visible measurements are not necessarily realizable.
+
+## Related specimens
+
+Related search edits up to six continuous anatomy inputs before solving the constraints. It preserves the body/head/limb/symmetry family by default; `samePhenotype: false` also varies structural modules. It does not pad results by changing the seed quotient or microscopic detail.
+
+Each ordinary result must be separated from the target and every other result by at least 0.06 squared L2 distance between normalized silhouette descriptors. The descriptors exclude decorative motifs and surface seams. The solver tries at most eight genome constructions per requested result, then returns fewer results if necessary. This is a practical diversity threshold, not a proof of perceptual uniqueness. `diversity` reports skipped duplicates, the threshold and whether the requested count could be filled.
+
+Anatomy similarity combines silhouette overlap with trait distances. Appearance and ecology categories report trait similarity. These are ranking measures, not probabilities or a guarantee of global nearest neighbours.
+
+The regression report in `related-search-audit.json` checks 100 starting specimens, including the reported winged seed, against their constructed relatives. The discovery audit uses 96 fixed silhouette groups and also reports the coarser 40-group diagnostic; groups are a finite visual heuristic, not unique species.
