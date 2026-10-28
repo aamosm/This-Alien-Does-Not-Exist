@@ -5,7 +5,7 @@ import {
   headHull,
   baseLimbCount,
 } from "./anatomy.js";
-import { decode, unit, tableChoice } from "./grammar-genome.js";
+import { decode, unit, tableChoice, choiceInterval} from "./grammar-genome.js";
 import { silhouette, repairSilhouette } from "./silhouette.js";
 import { oklchRGB } from "./colour.js";
 export const POOLS = {
@@ -178,6 +178,10 @@ export function parameters(seed) {
     choose = (k) => tableChoice(genome.digits[k], TABLES[k]);
   const p = {};
   for (const key of Object.keys(TABLES)) p[key] = choose(key);
+  for (const key of ["body", "head", "limbSet"]) {
+    const [lo, hi] = choiceInterval(p[key], TABLES[key]);
+    p[key + "Profile"] = (genome.digits[key] - lo) / Math.max(1, hi - lo);
+  }
   Object.assign(p, {
     length: lerp(145, 300, u("length")),
     width: lerp(20, 62, u("width")),
@@ -334,7 +338,7 @@ export function geometryOf(p) {
           : baseLimbCount(p.limbSet);
   for (let i = 0; i < limbCount; i++) {
     const side = i % 2 ? -1 : 1,
-      t = (i + 0.7) / (limbCount + 1.3),
+      t = ((i + 0.7) / (limbCount + 1.3)) ** (0.55 + p.limbSetProfile * 1.2),
       j = Math.round((0.2 + 0.65 * t) * (n - 1));
     const radial = p.symmetry === "Radial",
       root = radial
@@ -350,7 +354,9 @@ export function geometryOf(p) {
     let angle = radial
       ? p.phase + (i * TAU) / limbCount + 0.22 * Math.sin(i * 2.399 + p.phase)
       : (side > 0 ? 0 : Math.PI) + (0.25 + (li % 3) * 0.22) + p.pose * 0.45;
-    angle += 0.13 * Math.sin(i * 1.71 + p.phase);
+    angle +=
+      (p.limbSetProfile - 0.5) * 1.5 +
+      (0.12 + 0.3 * p.asymmetry) * Math.sin(i * 1.71 + p.phase);
     const symmetry =
       p.symmetry === "Bilateral"
         ? 0.03
@@ -368,7 +374,9 @@ export function geometryOf(p) {
           ? j % 2
             ? 0.32
             : -0.24
-          : 0.25 * Math.sin(j * 0.8 + p.phase) + 0.14;
+          : (0.15 + 0.7 * p.limbSetProfile) *
+              Math.sin(j * (0.55 + p.taper) + p.phase) +
+            p.bend * 0.35;
       const a = angle + curve + side * j * 0.07;
       cursor = {
         x: cursor.x + (Math.cos(a) * length) / seg,

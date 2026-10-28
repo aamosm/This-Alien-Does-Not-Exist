@@ -168,5 +168,9 @@ export function setChoice(g, key, value, table) {
   const range = choiceInterval(value, table);
   if (!range || range[0] > range[1])
     throw new RangeError("Unreachable choice: " + value);
-  g.digits[key] = Math.floor((range[0] + range[1]) / 2);
+  const current = choiceInterval(tableChoice(g.digits[key], table), table);
+  const position = current
+    ? (g.digits[key] - current[0]) / Math.max(1, current[1] - current[0])
+    : 0.5;
+  g.digits[key] = range[0] + Math.round(position * (range[1] - range[0]));
 }

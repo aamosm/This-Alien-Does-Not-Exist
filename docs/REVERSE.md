@@ -31,3 +31,7 @@ Each ordinary result must be separated from the target and every other result by
 Anatomy similarity combines silhouette overlap with trait distances. Appearance and ecology categories report trait similarity. These are ranking measures, not probabilities or a guarantee of global nearest neighbours.
 
 The regression report in `related-search-audit.json` checks 100 starting specimens, including the reported winged seed, against their constructed relatives. The discovery audit uses 96 fixed silhouette groups and also reports the coarser 40-group diagnostic; groups are a finite visual heuristic, not unique species.
+
+## Internal anatomical variation
+
+The numerical position within a body/head/limb-set choice interval now controls actual shape: mass distribution, torso curvature, head aspect, appendage attachment and bend. Category labels no longer exhaust the information in those digits. Inverse projection transports that relative position when selecting a different category and leaves it intact when the category already matches. Related search varies those positions directly before forward verification. This fixes generation and construction itself; the outline deduplicator remains a secondary guard. No seed permutation or encoding width changed. Existing current-generator pictures change because the geometry interprets more of the genome.

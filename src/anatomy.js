@@ -81,7 +81,7 @@ export function bodyScaffold(p) {
   const config = profiles[p.body],
     spine = [],
     radii = [],
-    length = p.length * config.length;
+    length = p.length * config.length * (0.78 + 0.44 * (p.bodyProfile ?? 0.5));
   for (let i = 0; i < 14; i++) {
     const t = i / 13;
     let x = Math.sin(t * Math.PI + p.phase * 0.12) * p.bend * length * 0.09;
@@ -102,11 +102,19 @@ export function bodyScaffold(p) {
         length *
         (0.11 + 0.06 * p.bend);
     if (p.body === "Bean") x += Math.sin(t * Math.PI) * p.width * 0.5;
-    spine.push({ x, y: (t - 0.5) * length });
+    const profile = p.bodyProfile ?? 0.5;
+    x += 
+      Math.sin(Math.PI*t)*
+      Math.sin(t * Math.PI * (1.5+profile*2.5)+ p.phase) *
+      length * 
+      (0.025 +0.12 * Math.abs(p.bend));
+    spine.push({x, y : (t-0.5)*length });
     radii.push(
       p.width *
         config.width *
-        interpolate(config.widths, t) *
+        interpolate(config.widths, t ** (0.65 + 0.7 * profile)) *
+        Math.exp((t - 0.5) * (p.taper - 0.5) * 2.8) *
+        (0.72 + 0.55 * Math.sin(Math.PI * (t * 0.7 + profile * 0.3))) *
         (1 + p.lobes * 0.3 * Math.sin(t * Math.PI * p.segments + p.phase)),
     );
   }
@@ -155,8 +163,12 @@ export function headDimensions(p) {
     Offset: [1.1, 0.9],
   }[p.head];
   return {
-    rx: p.headSize * p.headWidth * factors[0],
-    ry: p.headSize * factors[1],
+    rx:
+      p.headSize *
+      p.headWidth *
+      factors[0] *
+      (0.7 + 0.6 * (p.headProfile ?? 0.5)),
+    ry: p.headSize * factors[1] * (1.2 - 0.4 * (p.headProfile ?? 0.5)),
   };
 }
 export function headHull(head, module) {

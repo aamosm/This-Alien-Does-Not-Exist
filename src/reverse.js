@@ -183,7 +183,8 @@ function projectDirect(g, cs, proof) {
         candidates.find(
           (c) => c.value === current && c.cost === candidates[0].cost,
         ) ?? candidates[0];
-      setChoice(g, spec.gene, best.value, spec.table);
+      if (current !== best.value)
+        setChoice(g, spec.gene, best.value, spec.table);
       proof[field] = {
         method: "cdf-interval",
         interval: choiceInterval(best.value, spec.table),
@@ -591,6 +592,13 @@ export async function solveQuery(
         g.digits[key] = Math.round(
           value < 0 ? -value : value > 65535 ? 131070 - value : value,
         );
+      }
+      for (const [j, key] of ["body", "head", "limbSet"].entries()) {
+        const category = tableChoice(g.digits[key], TABLES[key]);
+        const [lo, hi] = choiceInterval(category, TABLES[key]);
+        const fraction =
+          ((serial + 1) * [0.61803398875, 0.41421356237, 0.73205080757][j]) % 1;
+        g.digits[key] = lo + Math.round(fraction * (hi - lo));
       }
       if (!query.samePhenotype) {
         const key = ["body", "head", "limbSet", "limbShape"][serial % 4];
