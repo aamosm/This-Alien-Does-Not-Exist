@@ -1,3 +1,4 @@
+import { createCombatUI } from "./combat-ui.js";
 import { queryURL } from "./api.js";
 import { parseRoute, routeURL } from "./routes.js";
 import { seedString } from "./random.js";
@@ -23,6 +24,7 @@ const initialURL = location.href;
 const $ = (id) => document.getElementById(id),
   canvas = $("alienCanvas"),
   ctx = canvas.getContext("2d");
+const combatUI = createCombatUI({ generate });
 const store = new CatalogueStore(),
   saved = new Map(),
   cache = new Map();
@@ -71,6 +73,7 @@ function updateStorage() {
     "Discoveries are saved in this browser. Export to keep a portable copy.";
 }
 function showRecord(record) {
+  combatUI.show(record);
   const panel = $("record-panel");
   panel.replaceChildren();
   panel.style.opacity =
@@ -287,6 +290,7 @@ function attempt(seed, options) {
   }
 }
 function showLimit() {
+  combatUI.show(null);
   stopSkin();
   ++renderID;
   current = null;
