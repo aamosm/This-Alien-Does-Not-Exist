@@ -1,0 +1,26 @@
+{
+  "name": "this-alien-does-not-exist",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reversible modular alien generator with textured rendering and a browser API.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test tests/*.test.js",
+    "test:browser": "node --test tests/browser.test.mjs",
+    "audit": "node scripts/audit.mjs",
+    "benchmark": "node scripts/benchmark.mjs",
+    "catalogue": "node scripts/catalogue.mjs",
+    "package": "python3 scripts/package.py",
+    "build": "node scripts/build.mjs",
+    "search": "node scripts/search.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "playwright": "1.55.1"
+  }
+}

@@ -1,32 +1,62 @@
 <!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Redirecting...</title>
-
-<script>
-(function () {
-
-    const params = new URLSearchParams(location.search);
-
-
-    if (params.has("p")) {
-        location.replace("/" + location.search);
-        return;
-    }
-
-    location.replace(
-        "/?p=" +
-        encodeURIComponent(
-            location.pathname +
-            location.search +
-            location.hash
-        )
-    );
-
-})();
-</script>
-
-</head>
-<body></body>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Finding your specimen</title>
+    <style>
+      body {
+        font: 16px system-ui;
+        background: #0c1113;
+        color: #dbe4df;
+        max-width: 600px;
+        margin: 15vh auto;
+        padding: 24px;
+        line-height: 1.7;
+      }
+      a {
+        color: #b1e2ad;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Finding your specimen</h1>
+    <p id="message">Opening the generator with this address.</p>
+    <p><a id="home" href="/">Open the catalogue</a></p>
+    <noscript
+      ><p>
+        JavaScript is required to reconstruct a specimen. The catalogue link
+        above will take you to the homepage.
+      </p></noscript
+    >
+    <script>
+      const configuredBase = "";
+      const first = location.pathname.split("/").filter(Boolean)[0] || "";
+      const projectPath =
+        location.hostname.endsWith(".github.io") &&
+        !/^\d+$/.test(first) &&
+        !["v1", "v2", "index.html", "404.html"].includes(first) &&
+        !first.includes(".") &&
+        first;
+      const base = configuredBase || (projectPath ? "/" + first : "");
+      const home = (base || "") + "/";
+      document.getElementById("home").href = home;
+      const suffix = location.pathname
+        .slice(base.length)
+        .replace(/^\/+|\/+$/g, "");
+      if (/^(?:(?:v1|v2)\/)?\d+$/.test(suffix)) {
+        const destination = new URL(home, location.origin);
+        destination.searchParams.set(
+          "route",
+          location.pathname + location.search + location.hash,
+        );
+        location.replace(destination.href);
+      } else {
+        document.title = "Specimen not found";
+        document.querySelector("h1").textContent = "Specimen not found";
+        document.getElementById("message").textContent =
+          "This address is not a valid specimen route. Open the catalogue and enter a decimal seed.";
+      }
+    </script>
+  </body>
 </html>

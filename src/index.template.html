@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta
+      name="description"
+      content="A procedural alien, generated from a number."
+    />
+    <title>This Alien Doesn't Exist</title>
+    <link id="alien-favicon" rel="icon" type="image/png" href="data:," />
+    <style>
+      /* APP_STYLE */
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <h1 class="sr-only">This Alien Doesn't Exist</h1>
+      <nav class="toolbar" aria-label="Alien tools">
+        <button id="open-search" type="button">Search &amp; filters</button>
+        <button id="open-save" type="button" disabled>Save…</button>
+        <label class="render-choice"
+          >Render<select id="render-mode">
+            <option value="skin">Skin</option>
+            <option value="quick">Quick</option>
+          </select></label
+        >
+      </nav>
+      <section class="layout" aria-label="Alien generator">
+        <div class="canvas-wrap">
+          <canvas
+            id="alienCanvas"
+            width="700"
+            height="700"
+            role="button"
+            tabindex="0"
+            title="Click to load another entity"
+            aria-label="Generate another alien"
+          ></canvas>
+          <div
+            id="canvas-message"
+            class="canvas-message"
+            role="status"
+            hidden
+          ></div>
+        </div>
+        <aside class="panel">
+          <div id="alienData">
+            <div class="seed-row">
+              <span>Entity Seed:</span><span id="specimen-id">—</span
+              ><button
+                class="copy-btn"
+                id="copy-link"
+                type="button"
+                aria-label="Copy specimen link"
+              >
+                Copy
+              </button>
+            </div>
+            <div id="record-panel">Loading entity…</div>
+          </div>
+          <div class="controls">
+            <form id="navigation">
+              <label class="sr-only" for="seedInput">Custom seed</label
+              ><input
+                id="seedInput"
+                type="text"
+                placeholder="Custom Seed…"
+                inputmode="numeric"
+                autocomplete="off"
+                required
+              /><button id="generateBtn" type="submit">Load</button>
+            </form>
+            <p id="status" role="status" aria-live="polite">Loading entity…</p>
+            <div class="hint">Click the entity to discover another.</div>
+          </div>
+        </aside>
+      </section>
+    </main>
+    <dialog id="save-dialog" aria-labelledby="save-title">
+      <div class="dialog-heading">
+        <h2 id="save-title">Save</h2>
+        <button id="close-save" type="button">Close</button>
+      </div>
+      <form id="save-form">
+        <label for="save-format">What would you like to save?</label>
+        <select id="save-format">
+          <option value="image">This image · PNG</option>
+          <option value="record">This alien's data · JSON</option>
+          <option value="catalogue">All discoveries · JSONL</option>
+        </select>
+        <button id="save-download" type="submit" disabled>Download</button>
+      </form>
+      <details class="tools">
+        <summary>Saved discoveries</summary>
+        <p id="saved-count" class="small"></p>
+        <p id="storage-status" class="small"></p>
+        <label class="file-button"
+          >Import records<input
+            id="import-catalogue"
+            class="sr-only"
+            type="file"
+            accept=".json,.jsonl,application/json"
+        /></label>
+        <p id="import-status" class="small" role="status"></p>
+      </details>
+    </dialog>
+    <dialog id="search-dialog" aria-labelledby="search-title">
+      <div class="dialog-heading">
+        <h2 id="search-title">Search &amp; filters</h2>
+        <button id="close-search" type="button" aria-label="Close search">
+          Close
+        </button>
+      </div>
+      <p class="search-intro">
+        Choose the traits you want. The engine works backward from those traits
+        to a seed you can open and share.
+      </p>
+      <div class="search-examples" aria-label="Try an example">
+        <span>Try:</span
+        ><button type="button" data-preset="eyes">
+          Four eyes, spotted skin</button
+        ><button type="button" data-preset="wings">Blue with wings</button
+        ><button type="button" data-preset="similar">
+          Similar to this alien
+        </button>
+      </div>
+      <form id="search-form">
+        <label class="like-choice"
+          ><input id="like-current" type="checkbox" /> Start from the alien on
+          screen</label
+        >
+        <label class="search-label" id="match-category-wrap" hidden
+          >Match category<select id="match-category">
+            <option value="closest">Overall resemblance</option>
+            <option value="anatomy">Anatomy</option>
+            <option value="appearance">Appearance</option>
+            <option value="ecology">Ecology</option>
+          </select></label
+        >
+        <p id="like-description" class="field-help">
+          Unspecified traits can vary.
+        </p>
+        <div id="filters"></div>
+        <div class="search-actions">
+          <button id="add-filter" type="button">+ Add characteristic</button
+          ><button id="find-matches" type="submit">Find matches</button
+          ><button id="cancel-search" type="button" hidden>Stop</button>
+        </div>
+        <p class="field-help">
+          All rows apply together. “About” allows a small difference; minimum
+          and maximum are bounds. Ratios compare lengths, not pixels.
+        </p>
+      </form>
+      <details class="search-help">
+        <summary>How does this work?</summary>
+        <p>
+          Each result encodes a set of developmental inputs in its seed. Counts,
+          colours and choices are solved by reversing their equations. Shape
+          ratios can need an approximate fit. Each result shows what matched and
+          what missed; “closest found” is not a guarantee of the closest alien
+          in the entire space.
+        </p>
+        <p>
+          Newly constructed seeds are long because they store the genome itself.
+          Use Copy or save the record. Existing short seed links still work.
+        </p>
+      </details>
+      <details class="machine-query">
+        <summary>Query JSON · for scripts and precise requests</summary>
+        <label for="query-json"
+          >Use the same query in the JavaScript API or command line.</label
+        ><textarea
+          id="query-json"
+          rows="6"
+          spellcheck="false"
+          placeholder='{"constraints":[{"field":"eyeCount","op":"eq","value":4}],"limit":6}'
+        ></textarea>
+        <div class="tool-row">
+          <button id="apply-query" type="button">Use this query</button
+          ><button id="copy-query" type="button">Copy search link</button>
+        </div>
+      </details>
+      <p id="search-status" role="status" aria-live="polite">
+        Start with an example or add a characteristic.
+      </p>
+      <div id="results" aria-live="polite"></div>
+    </dialog>
+    <noscript><p>This generator needs JavaScript enabled.</p></noscript>
+    <script>
+      /* APP_SCRIPT */
+    </script>
+  </body>
+</html>
