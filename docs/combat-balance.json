@@ -1,0 +1,191 @@
+{
+  "ruleset": 1,
+  "specimens": 120,
+  "battles": 960,
+  "ordinaryBudget": 800,
+  "draws": 0,
+  "meanRounds": 10.565625,
+  "byAbility": {
+    "vigor": {
+      "appearances": 480,
+      "wins": 243
+    },
+    "renewal": {
+      "appearances": 608,
+      "wins": 316
+    },
+    "tenacity": {
+      "appearances": 368,
+      "wins": 140
+    },
+    "bulwark": {
+      "appearances": 528,
+      "wins": 249
+    },
+    "quickening": {
+      "appearances": 464,
+      "wins": 223
+    },
+    "insight": {
+      "appearances": 608,
+      "wins": 330
+    },
+    "surge": {
+      "appearances": 448,
+      "wins": 262
+    },
+    "surefoot": {
+      "appearances": 336,
+      "wins": 157
+    }
+  },
+  "perSpecimenWinRange": [
+    0.125,
+    0.9375
+  ],
+  "piExamples": [
+    {
+      "m": 1,
+      "profile": {
+        "ruleset": 1,
+        "absolute": false,
+        "budget": 800,
+        "stats": {
+          "vitality": 110,
+          "power": 90,
+          "defense": 90,
+          "dexterity": 110,
+          "speed": 100,
+          "intellect": 110,
+          "resolve": 100,
+          "recovery": 90
+        },
+        "abilities": [
+          "surefoot",
+          "renewal"
+        ]
+      }
+    },
+    {
+      "m": 2,
+      "profile": {
+        "ruleset": 1,
+        "absolute": false,
+        "budget": 867.31,
+        "stats": {
+          "vitality": 113.953,
+          "power": 85.375,
+          "defense": 97.906,
+          "dexterity": 119.881,
+          "speed": 105.919,
+          "intellect": 132.929,
+          "resolve": 115.813,
+          "recovery": 95.534
+        },
+        "abilities": [
+          "surefoot",
+          "renewal"
+        ]
+      }
+    },
+    {
+      "m": 14,
+      "profile": {
+        "ruleset": 1,
+        "absolute": false,
+        "budget": 1194.593,
+        "stats": {
+          "vitality": 136.861,
+          "power": 58.573,
+          "defense": 143.722,
+          "dexterity": 130.376,
+          "speed": 124.218,
+          "intellect": 265.794,
+          "resolve": 207.444,
+          "recovery": 127.605
+        },
+        "abilities": [
+          "surefoot",
+          "insight"
+        ]
+      }
+    },
+    {
+      "m": 100,
+      "profile": {
+        "ruleset": 1,
+        "absolute": false,
+        "budget": 1325.896,
+        "stats": {
+          "vitality": 149.134,
+          "power": 44.213,
+          "defense": 168.268,
+          "dexterity": 103.183,
+          "speed": 122.796,
+          "intellect": 336.978,
+          "resolve": 256.536,
+          "recovery": 144.788
+        },
+        "abilities": [
+          "insight",
+          "tenacity"
+        ]
+      }
+    },
+    {
+      "m": 500,
+      "profile": {
+        "ruleset": 1,
+        "absolute": false,
+        "budget": 1395.355,
+        "stats": {
+          "vitality": 157.187,
+          "power": 34.791,
+          "defense": 184.374,
+          "dexterity": 72.902,
+          "speed": 117.607,
+          "intellect": 383.684,
+          "resolve": 288.748,
+          "recovery": 156.062
+        },
+        "abilities": [
+          "insight",
+          "tenacity"
+        ]
+      }
+    },
+    {
+      "m": 999,
+      "profile": {
+        "ruleset": 1,
+        "absolute": false,
+        "budget": 1416.478,
+        "stats": {
+          "vitality": 159.997,
+          "power": 31.504,
+          "defense": 189.994,
+          "dexterity": 60.015,
+          "speed": 115.003,
+          "intellect": 399.982,
+          "resolve": 299.987,
+          "recovery": 159.996
+        },
+        "abilities": [
+          "insight",
+          "tenacity"
+        ]
+      }
+    },
+    {
+      "m": 1000,
+      "profile": {
+        "ruleset": 1,
+        "absolute": true,
+        "stats": null,
+        "budget": null,
+        "abilities": []
+      }
+    }
+  ],
+  "limits": "Deterministic automated-play sample. Passive win rates include their associated stat distributions, not isolated causal effects. Pi progression and the final disc intentionally exceed ordinary parity."
+}

@@ -1152,6 +1152,82 @@
       "formula": "conditional or derived; see reverse.js"
     }
   },
+  "combat": {
+    "ruleset": 1,
+    "stats": {
+      "vitality": "Vitality",
+      "power": "Power",
+      "defense": "Defense",
+      "dexterity": "Dexterity",
+      "speed": "Speed",
+      "intellect": "Intellect",
+      "resolve": "Resolve",
+      "recovery": "Recovery"
+    },
+    "ordinaryBudget": 800,
+    "abilities": {
+      "bulwark": {
+        "name": "First Shell",
+        "description": "Takes 28% less damage while at full health."
+      },
+      "surge": {
+        "name": "Last Ember",
+        "description": "Deals 20% more damage below 30% health."
+      },
+      "surefoot": {
+        "name": "True Bearing",
+        "description": "Adds 6 percentage points to hit chance, up to 97%."
+      },
+      "quickening": {
+        "name": "Rising Tempo",
+        "description": "Gains 6% initiative per completed turn, up to 30%."
+      },
+      "insight": {
+        "name": "Quiet Calculation",
+        "description": "Feints deal 12% more damage."
+      },
+      "tenacity": {
+        "name": "Unbroken Thread",
+        "description": "Once, survives a lethal hit at 1 health if above 20% before the hit."
+      },
+      "renewal": {
+        "name": "Returning Pulse",
+        "description": "Restores 4% health on its third, sixth and ninth turns."
+      },
+      "vigor": {
+        "name": "Deep Reserve",
+        "description": "Maximum health +8%; starts with 125 energy instead of 100."
+      }
+    },
+    "actions": {
+      "strike": {
+        "name": "Strike",
+        "cost": 8,
+        "description": "Efficient physical attack. Power against defense."
+      },
+      "feint": {
+        "name": "Feint",
+        "cost": 18,
+        "description": "Dexterity and intellect; partly bypasses guard and armor."
+      },
+      "guard": {
+        "name": "Guard",
+        "cost": 0,
+        "description": "Blocks 55% of strikes or 18% of feints until the next action; restores 18 energy."
+      },
+      "recover": {
+        "name": "Recover",
+        "cost": 0,
+        "description": "Restores 26 energy. Healing has a three-turn cooldown."
+      },
+      "focus": {
+        "name": "Focus",
+        "cost": 8,
+        "description": "Empowers the next two attacks. High intellect increases the bonus."
+      }
+    },
+    "maxRounds": 40
+  },
   "search": {
     "limit": [
       1,

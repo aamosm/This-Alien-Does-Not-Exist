@@ -1,3 +1,11 @@
+import {
+  simulateBattle,
+  COMBAT_RULESET,
+  STAT_NAMES,
+  ACTIONS,
+  ABILITIES,
+} from "./combat.js";
+import { piSeed } from "./pi.js";
 import { piLength } from "./pi.js";
 import { generate as build, catalogueRecord } from "./engine.js";
 import {
@@ -9,6 +17,17 @@ import {
 import { FIELDS, OPTIONS, LABELS, UNITS, DIRECT } from "./traits.js";
 import { routeURL, parseRoute } from "./routes.js";
 export { normalizeQuery, decodeSeed, seedFromGenome, routeURL, parseRoute };
+export function duel(
+  left,
+  right,
+  { leftVersion = 2, rightVersion = 2, battleSeed = "0" } = {},
+) {
+  return simulateBattle(
+    build(left, { generatorVersion: leftVersion }),
+    build(right, { generatorVersion: rightVersion }),
+    { battleSeed },
+  );
+}
 export function generate(seed, { generatorVersion = 2, compact = false } = {}) {
   const record = build(seed, { generatorVersion });
   return compact ? catalogueRecord(record) : record;
@@ -42,6 +61,14 @@ export function schema() {
         },
       ]),
     ),
+    combat: {
+      ruleset: COMBAT_RULESET,
+      stats: STAT_NAMES,
+      ordinaryBudget: 800,
+      abilities: ABILITIES,
+      actions: ACTIONS,
+      maxRounds: 40,
+    },
     search: {
       limit: [1, 12],
       categories: ["traits", "closest", "anatomy", "appearance", "ecology"],
@@ -63,6 +90,13 @@ export function requestFromURL(input) {
     "limit",
     "category",
     "direction",
+    "left",
+    "right",
+    "leftPi",
+    "rightPi",
+    "lv",
+    "rv",
+    "battle",
   ])
     if (p.getAll(k).length > 1) throw new TypeError("Duplicate API parameter.");
   const op =
@@ -71,6 +105,31 @@ export function requestFromURL(input) {
     url.pathname.split("/").filter(Boolean).at(-1) ??
     "schema";
   if (op === "schema") return { op };
+  if (op === "duel") {
+    for (const side of ["left", "right"]) {
+      if (
+        p.has(side + "Pi") &&
+        Number(p.get(side === "left" ? "lv" : "rv") ?? 2) !== 2
+      )
+        throw new TypeError(
+          "Compact pi identities require the current generator.",
+        );
+      if (p.has(side) === p.has(side + "Pi"))
+        throw new TypeError(`Provide exactly one of ${side} or ${side}Pi.`);
+    }
+    return {
+      op,
+      left: p.has("leftPi") ? piSeed(Number(p.get("leftPi"))) : p.get("left"),
+      right: p.has("rightPi")
+        ? piSeed(Number(p.get("rightPi")))
+        : p.get("right"),
+      options: {
+        leftVersion: Number(p.get("lv") ?? 2),
+        rightVersion: Number(p.get("rv") ?? 2),
+        battleSeed: p.get("battle") ?? "0",
+      },
+    };
+  }
   if (op === "search") {
     const text = p.get("q");
     if (!text || text.length > 24000)
@@ -115,6 +174,8 @@ export async function request(input) {
       return search(input.query);
     case "closest":
       return closest(input.seed, input.options);
+    case "duel":
+      return duel(input.left, input.right, input.options);
     case "schema":
       return schema();
     default:
