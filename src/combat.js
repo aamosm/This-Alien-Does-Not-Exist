@@ -1,229 +1,77 @@
-import { hashKey, mix64 } from "./random.js";
-
-export const COMBAT_RULESET = 1;
-export const STAT_NAMES = Object.freeze({
-  vitality: "Vitality",
-  power: "Power",
-  defense: "Defense",
-  dexterity: "Dexterity",
-  speed: "Speed",
-  intellect: "Intellect",
-  resolve: "Resolve",
-  recovery: "Recovery",
-});
-export const ABILITIES = Object.freeze({
-  bulwark: {
-    name: "First Shell",
-    description: "Takes 28% less damage while at full health.",
-  },
-  surge: {
-    name: "Last Ember",
-    description: "Deals 20% more damage below 30% health.",
-  },
-  surefoot: {
-    name: "True Bearing",
-    description: "Adds 6 percentage points to hit chance, up to 97%.",
-  },
-  quickening: {
-    name: "Rising Tempo",
-    description: "Gains 6% initiative per completed turn, up to 30%.",
-  },
-  insight: {
-    name: "Quiet Calculation",
-    description: "Feints deal 12% more damage.",
-  },
-  tenacity: {
-    name: "Unbroken Thread",
-    description:
-      "Once, survives a lethal hit at 1 health if above 20% before the hit.",
-  },
-  renewal: {
-    name: "Returning Pulse",
-    description: "Restores 4% health on its third, sixth and ninth turns.",
-  },
-  vigor: {
-    name: "Deep Reserve",
-    description: "Maximum health +8%; starts with 125 energy instead of 100.",
-  },
-});
-export const ACTIONS = Object.freeze({
-  strike: {
-    name: "Strike",
-    cost: 8,
-    description: "Efficient physical attack. Power against defense.",
-  },
-  feint: {
-    name: "Feint",
-    cost: 18,
-    description: "Dexterity and intellect; partly bypasses guard and armor.",
-  },
-  guard: {
-    name: "Guard",
-    cost: 0,
-    description:
-      "Blocks 55% of strikes or 18% of feints until the next action; restores 18 energy.",
-  },
-  recover: {
-    name: "Recover",
-    cost: 0,
-    description: "Restores 26 energy. Healing has a three-turn cooldown.",
-  },
-  focus: {
-    name: "Focus",
-    cost: 8,
-    description:
-      "Empowers the next two attacks. High intellect increases the bonus.",
-  },
-});
-const clamp = (x, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, x));
-const round = (n) => Math.round(n * 1000) / 1000;
-const KEYS = Object.keys(STAT_NAMES);
-const abilityFor = {
-  vitality: "vigor",
-  power: "surge",
-  defense: "bulwark",
-  dexterity: "surefoot",
-  speed: "quickening",
-  intellect: "insight",
-  resolve: "tenacity",
-  recovery: "renewal",
-};
-const idOf = (r) =>
-  `${r.generatorVersion ?? r.identity.generatorVersion}:${r.identity.seed}`;
-function budgetStats(weights) {
-  const sum = weights.reduce((a, b) => a + b, 0);
-  const exact = weights.map((w) => 40 + (480 * w) / sum),
-    values = exact.map(Math.floor);
-  const order = exact
-    .map((v, i) => [v - values[i], i])
-    .sort((a, b) => b[0] - a[0] || a[1] - b[1]);
-  for (let i = 0, left = 800 - values.reduce((a, b) => a + b, 0); i < left; i++)
-    values[order[i][1]]++;
-  return Object.fromEntries(KEYS.map((key, i) => [key, values[i]]));
-}
-export function combatProfile(record) {
-  if (record.kind === "pi-path" && record.pi.t === 1)
-    return {
-      ruleset: COMBAT_RULESET,
-      absolute: true,
-      stats: null,
-      budget: null,
-      abilities: [],
-    };
-  let stats, abilities;
-  if (record.kind === "pi-path") {
-    const t = record.pi.t;
-    stats = {
-      vitality: round(110 + 50 * t),
-      power: round(90 * (1 - 0.65 * t)),
-      defense: round(90 + 100 * t),
-      dexterity: round(110 + 140 * t - 190 * t * t),
-      speed: round(100 + 80 * t - 65 * t * t),
-      intellect: round(110 + 290 * t),
-      resolve: round(100 + 200 * t),
-      recovery: round(90 + 70 * t),
-    };
-    abilities =
-      t < 0.2
-        ? ["surefoot", "renewal"]
-        : t < 0.55
-          ? ["surefoot", "insight"]
-          : ["insight", "tenacity"];
-  } else {
-    const m = record.measurements ?? {};
-    const n = (key, lo, hi, fallback = 0.5) =>
-      Number.isFinite(m[key]) ? clamp((m[key] - lo) / (hi - lo)) : fallback;
-    const mass = (n("bodyLength", 145, 300) + n("bodyWidth", 20, 62)) / 2;
-    const reach = n("limbBodyRatio", 0, 1.25),
-      limbs = n("limbCount", 0, 9),
-      eyes = n("eyeCount", 0, 12);
-    const thickness = n("limbThicknessRatio", 0, 0.5),
-      head = n("headBodyRatio", 0, 0.35);
-    const caution = n("caution", 0, 1),
-      exploration = n("exploration", 0, 1),
-      resources = n("resources", 0, 1);
-    const weights = [
-      0.5 + 1.7 * mass + 0.3 * resources,
-      0.5 + 1.2 * mass + 0.8 * thickness + (m.horns ? 0.15 : 0),
-      0.5 + 1.2 * thickness + 0.8 * mass + 0.4 * caution,
-      0.5 + 1.1 * limbs + 0.7 * eyes + 0.5 * (1 - mass),
-      0.5 + 1.2 * reach + 1.1 * (1 - mass) + (m.wings ? 0.25 : 0),
-      0.5 + 1.1 * head + 0.8 * exploration + 0.3 * caution,
-      0.5 + 1.1 * caution + 0.6 * n("relativeGravity", 0.45, 1.8),
-      0.5 + 1.3 * resources + 0.7 * n("moisture", 0, 1),
-    ];
-    stats = budgetStats(weights);
-    const pool = KEYS.map((key) => ({
-      id: abilityFor[key],
-      weight: (stats[key] / 100) ** 2,
-    }));
-    abilities = [];
-    for (let slot = 0; slot < 2; slot++) {
-      const total = pool.reduce((sum, x) => sum + x.weight, 0);
-      let pick =
-        (Number(mix64(hashKey(idOf(record) + "|ability|" + slot)) >> 11n) /
-          9007199254740992) *
-        total;
-      let chosen = pool.length - 1;
-      for (let i = 0; i < pool.length; i++) {
-        pick -= pool[i].weight;
-        if (pick < 0) {
-          chosen = i;
-          break;
-        }
-      }
-      abilities.push(pool[chosen].id);
-      pool.splice(chosen, 1);
-    }
-  }
-  return {
-    ruleset: COMBAT_RULESET,
-    absolute: false,
-    budget: round(Object.values(stats).reduce((a, b) => a + b, 0)),
-    stats,
-    abilities,
-  };
-}
-const has = (f, a) => f.profile.abilities.includes(a);
-const roll = (s, actor, tag) =>
-  Number(mix64(hashKey(`${s.key}|${s.round}|${actor.id}|${tag}`)) >> 11n) /
-  9007199254740992;
+import { COMBAT_RULESET, MAX_ROUNDS, ACTIONS } from "./combat-rules.js";
+import { combatProfile } from "./combat-profile.js";
+import {
+  ecologyProfile,
+  environmentFor,
+  conditions,
+  randomUnit,
+  clamp,
+} from "./combat-environment.js";
+export {
+  COMBAT_RULESET,
+  MAX_ROUNDS,
+  STAT_NAMES,
+  STAT_HELP,
+  ABILITIES,
+  ACTIONS,
+  TERRAINS,
+  TIMES,
+} from "./combat-rules.js";
+export { combatProfile } from "./combat-profile.js";
+export { conditions, environmentFor } from "./combat-environment.js";
+const has = (f, id) => f.profile.abilities.includes(id);
+const roll = (s, f, tag) => randomUnit(`${s.key}|${s.round}|${f.id}|${tag}`);
+const snapshot = (s) =>
+  s.fighters.map((f) => ({
+    hp: f.hp,
+    energy: f.energy,
+    sleep: f.sleep,
+    poison: f.poison,
+    slow: f.slow,
+    focus: f.focus,
+  }));
 function fighter(record) {
   const profile = combatProfile(record),
     maxHP = profile.absolute
       ? null
       : Math.round(
-          (180 + 2 * profile.stats.vitality) *
+          (300 + 2 * profile.stats.vitality) *
             (profile.abilities.includes("vigor") ? 1.08 : 1),
         );
-  const maxEnergy = profile.abilities.includes("vigor") ? 125 : 100;
+  const maxEnergy = profile.absolute
+    ? null
+    : profile.abilities.includes("vigor")
+      ? 125
+      : 100;
   return {
-    id: idOf(record),
+    id: `${record.generatorVersion ?? record.identity.generatorVersion}:${record.identity.seed}`,
     identity: record.identity,
     profile,
+    ecology: ecologyProfile(record),
     maxHP,
     hp: maxHP,
-    energy: profile.absolute ? null : maxEnergy,
-    maxEnergy: profile.absolute ? null : maxEnergy,
+    maxEnergy,
+    energy: maxEnergy,
     guard: false,
     focus: 0,
     turns: 0,
-    lastHeal: -3,
     saved: false,
+    sleep: 0,
+    poison: 0,
+    slow: 0,
+    cooldowns: {},
     lastAction: null,
   };
 }
-export function createBattle(left, right, { battleSeed = "0" } = {}) {
-  if (typeof battleSeed !== "string" || battleSeed.length > 128)
-    throw new TypeError(
-      "Battle seed must be a string of at most 128 characters.",
-    );
-  const fighters = [fighter(left), fighter(right)];
-  const state = {
+export function createBattle(left, right, options = {}) {
+  const environment = environmentFor(options),
+    fighters = [fighter(left), fighter(right)];
+  const s = {
     ruleset: COMBAT_RULESET,
-    key: [...fighters.map((f) => f.id)].sort().join("|") + "|" + battleSeed,
+    environment,
+    key: JSON.stringify([fighters.map((f) => f.id).sort(), environment]),
     round: 0,
-    maxRounds: 40,
+    maxRounds: MAX_ROUNDS,
     fighters,
     winner: null,
     finished: false,
@@ -232,38 +80,107 @@ export function createBattle(left, right, { battleSeed = "0" } = {}) {
   };
   const [a, b] = fighters;
   if (a.profile.absolute || b.profile.absolute) {
-    state.finished = true;
-    state.winner =
+    s.finished = true;
+    s.winner =
       a.profile.absolute === b.profile.absolute
         ? null
         : a.profile.absolute
           ? 0
           : 1;
-    state.reason = state.winner === null ? "absolute-draw" : "absolute";
+    s.reason = s.winner === null ? "absolute-draw" : "absolute";
   } else if (a.id === b.id) {
-    state.finished = true;
-    state.reason = "identical";
+    s.finished = true;
+    s.reason = "identical";
   }
-  return state;
+  return s;
 }
-export function chooseAction(state, index) {
+export function effectiveStats(f, s) {
+  if (f.profile.absolute) return null;
+  const p = { ...f.profile.stats },
+    c = conditions(f, s.environment);
+  for (const [k, multiplier] of Object.entries(c.bonuses)) p[k] *= multiplier;
+  if (f.slow) p.speed *= 0.8;
+  if (has(f, "quickening")) p.speed *= 1 + Math.min(0.24, 0.03 * s.round);
+  return p;
+}
+export function actionAvailability(s, index, action) {
   if (![0, 1].includes(index))
     throw new TypeError("Fighter index must be 0 or 1.");
-  const a = state.fighters[index],
-    b = state.fighters[1 - index];
-  if (a.profile.absolute || state.finished) return "strike";
-  const s = a.profile.stats;
-  if (a.energy < 8) return "recover";
-  const reasoning = clamp(s.intellect / 180, 0.25, 0.98);
-  if (roll(state, a, "decision") > reasoning)
-    return a.energy >= 18 && roll(state, a, "guess") < 0.4 ? "feint" : "strike";
-  if (a.hp < a.maxHP * 0.45 && a.turns - a.lastHeal >= 3) return "recover";
-  if (a.energy < 18) return a.hp < a.maxHP * 0.7 ? "recover" : "guard";
-  if (!a.focus && b.hp > b.maxHP * 0.6 && a.hp > a.maxHP * 0.4) return "focus";
-  return (b.guard || s.intellect + s.dexterity > 2.05 * s.power) &&
-    a.energy >= 18
-    ? "feint"
-    : "strike";
+  const f = s.fighters[index],
+    move = ACTIONS[action];
+  let reason = "";
+  if (!move) reason = "Unknown combat action.";
+  else if (s.finished) reason = "This battle has finished.";
+  else if (f.sleep && action !== "sleep")
+    reason = `Asleep for ${f.sleep} more turn${f.sleep === 1 ? "" : "s"}.`;
+  else if (!f.sleep && action === "sleep") reason = "This creature is awake.";
+  else if (action === "rest" && has(f, "wakeful"))
+    reason = "Open Watch prevents sleep; use Breathe for energy.";
+  else if ((f.cooldowns[action] ?? 0) > s.round)
+    reason = `Ready in ${f.cooldowns[action] - s.round} round(s).`;
+  else if (action === "focus" && f.focus)
+    reason = `${f.focus} focused attack(s) remain.`;
+  else if (f.energy < move.cost)
+    reason = `Needs ${move.cost} energy; ${f.energy} available. Use Breathe.`;
+  return { available: !reason, reason };
+}
+export function availableActions(s, index) {
+  return Object.keys(ACTIONS).map((id) => ({
+    id,
+    ...ACTIONS[id],
+    ...actionAvailability(s, index, id),
+  }));
+}
+export function chooseAction(s, index) {
+  if (![0, 1].includes(index))
+    throw new TypeError("Fighter index must be 0 or 1.");
+  if (s.finished) return "strike";
+  const a = s.fighters[index],
+    b = s.fighters[1 - index],
+    ready = (id) => actionAvailability(s, index, id).available;
+  if (a.sleep) return "sleep";
+  if (a.hp < a.maxHP * 0.38 && ready("rest")) return "rest";
+  if ((a.poison || a.slow) && ready("cleanse")) return "cleanse";
+  if (a.energy < 24) return "recover";
+  if (!a.focus && b.hp > b.maxHP * 0.65 && ready("focus")) return "focus";
+  const p = effectiveStats(a, s);
+  const scores = {
+    strike: 2,
+    lunge: 1.7 + p.power / 250,
+    feint: 1.6 + p.intellect / 300 + (b.lastAction === "guard" ? 1 : 0),
+    pulse: 1.6 + p.intellect / 200,
+    sweep: b.slow ? 0.3 : 2,
+    venom: b.poison || has(b, "antivenom") ? 0 : 2,
+    drain: a.hp < a.maxHP * 0.65 ? 2.4 : 1,
+    lull: b.sleep || has(b, "wakeful") ? 0 : 1.5,
+    guard: a.energy < 40 ? 0.7 : 0.1,
+  };
+  // The AI sees only the previous state, never the player's current choice.
+  return (
+    Object.keys(scores)
+      .filter(ready)
+      .sort(
+        (x, y) =>
+          scores[y] +
+          roll(s, a, "ai-" + y) * 1.1 -
+          scores[x] -
+          roll(s, a, "ai-" + x) * 1.1,
+      )[0] ?? "recover"
+  );
+}
+function heal(s, f, amount) {
+  const fatigue = s.round > 45 ? 0 : s.round > 30 ? 0.5 : 1;
+  const h = Math.max(0, Math.min(f.maxHP - f.hp, Math.round(amount * fatigue)));
+  f.hp += h;
+  return h;
+}
+function endCheck(s) {
+  const dead = s.fighters.map((f) => f.hp <= 0);
+  if (dead.some(Boolean)) {
+    s.finished = true;
+    s.winner = dead[0] === dead[1] ? null : dead[0] ? 1 : 0;
+    s.reason = "knockout";
+  }
 }
 export function stepBattle(input, leftAction, rightAction) {
   if (input.ruleset !== COMBAT_RULESET)
@@ -273,33 +190,32 @@ export function stepBattle(input, leftAction, rightAction) {
     leftAction ?? chooseAction(input, 0),
     rightAction ?? chooseAction(input, 1),
   ];
-  if (actions.some((a) => !Object.hasOwn(ACTIONS, a)))
-    throw new TypeError("Unknown combat action.");
+  for (const [i, id] of actions.entries()) {
+    const result = actionAvailability(input, i, id);
+    if (!result.available) throw new TypeError(result.reason);
+  }
   const s = structuredClone(input);
   s.round++;
-  const initiative = (f) =>
-    f.profile.stats.speed *
-    (has(f, "quickening") ? 1 + Math.min(0.3, 0.06 * f.turns) : 1);
+  // Guard is a declared stance for the entire round, independent of speed.
+  s.fighters.forEach((f, i) => {
+    f.guard = actions[i] === "guard";
+  });
   const order = [0, 1].sort(
     (i, j) =>
-      initiative(s.fighters[j]) - initiative(s.fighters[i]) ||
+      effectiveStats(s.fighters[j], s).speed -
+        effectiveStats(s.fighters[i], s).speed ||
       roll(s, s.fighters[j], "initiative") -
         roll(s, s.fighters[i], "initiative"),
   );
   for (const i of order) {
     const a = s.fighters[i],
       b = s.fighters[1 - i],
-      p = a.profile.stats,
-      q = b.profile.stats;
-    if (a.hp <= 0 || b.hp <= 0) break;
-    a.turns++;
-    a.guard = false;
-    a.energy = Math.min(a.maxEnergy, a.energy + 6);
-    let action = actions[i];
-    if (a.energy < ACTIONS[action].cost) action = "recover";
-    a.energy -= ACTIONS[action].cost;
-    a.lastAction = action;
-    const event = {
+      p = effectiveStats(a, s),
+      q = effectiveStats(b, s);
+    // A signal may put the slower fighter to sleep after its choice was committed.
+    const action = a.sleep ? "sleep" : actions[i],
+      move = ACTIONS[action];
+    const e = {
       round: s.round,
       actor: i,
       action,
@@ -308,87 +224,196 @@ export function stepBattle(input, leftAction, rightAction) {
       hit: null,
       critical: false,
       ability: [],
+      notes: [],
     };
-    if (has(a, "renewal") && a.turns <= 9 && a.turns % 3 === 0) {
-      const h = Math.min(a.maxHP - a.hp, Math.round(a.maxHP * 0.04));
-      a.hp += h;
-      event.healing += h;
-      event.ability.push("renewal");
-    }
-    if (action === "guard") {
-      a.guard = true;
-      a.energy = Math.min(a.maxEnergy, a.energy + 18);
-    } else if (action === "recover") {
-      a.energy = Math.min(a.maxEnergy, a.energy + 26);
-      if (a.turns - a.lastHeal >= 3) {
-        const h = Math.min(
-          a.maxHP - a.hp,
-          Math.round(a.maxHP * 0.08 + p.recovery * 0.12),
-        );
-        a.hp += h;
-        event.healing += h;
-        a.lastHeal = a.turns;
-      }
-    } else if (action === "focus") a.focus = 2;
-    else {
-      const feint = action === "feint";
-      const chance = clamp(
-        (feint ? 0.91 : 0.86) +
-          (p.dexterity - q.speed) / 900 +
-          (a.focus ? 0.03 : 0) +
-          (has(a, "surefoot") ? 0.06 : 0),
-        0.65,
-        0.97,
+    a.turns++;
+    a.lastAction = action;
+    a.energy -= move.cost;
+    if (move.cooldown) a.cooldowns[action] = s.round + move.cooldown;
+    if (action === "guard") a.energy += 14;
+    else if (action === "recover") a.energy += 34;
+    else if (action === "focus") a.focus = 2;
+    else if (action === "cleanse") {
+      a.poison = 0;
+      a.slow = 0;
+      e.healing += heal(s, a, a.maxHP * 0.04);
+    } else if (action === "rest") {
+      a.poison = 0;
+      a.sleep = 2;
+      e.healing += heal(
+        s,
+        a,
+        (a.maxHP * 0.15 + p.recovery * 0.15) * (has(a, "torpor") ? 1.35 : 1),
       );
-      event.hit = roll(s, a, "hit") < chance;
-      if (event.hit) {
-        let damage =
-          ((feint
-            ? 16 + 0.18 * p.dexterity + 0.28 * p.intellect
-            : 20 + 0.42 * p.power) *
-            100) /
-          (feint ? 95 + 0.4 * q.defense : 75 + 0.65 * q.defense);
-        if (a.focus) damage *= Math.min(2.2, 1.65 + p.intellect / 1000);
-        if (has(a, "surge") && a.hp <= a.maxHP * 0.3) {
-          damage *= 1.2;
-          event.ability.push("surge");
-        }
-        if (has(a, "insight") && feint) {
-          damage *= 1.12;
-          event.ability.push("insight");
-        }
-        if (has(b, "bulwark") && b.hp === b.maxHP) {
-          damage *= 0.72;
-          event.ability.push("bulwark");
-        }
-        if (b.guard) damage *= feint ? 0.82 : 0.45;
-        event.critical =
-          roll(s, a, "critical") <
-          0.04 + (0.12 * p.dexterity) / (p.dexterity + q.resolve);
-        if (event.critical) damage *= 1.35;
-        let amount = Math.max(1, Math.round(damage));
-        if (
-          amount >= b.hp &&
-          has(b, "tenacity") &&
-          !b.saved &&
-          b.hp > b.maxHP * 0.2
-        ) {
-          amount = b.hp - 1;
-          b.saved = true;
-          event.ability.push("tenacity");
-        }
-        event.damage = Math.min(b.hp, amount);
-        b.hp -= event.damage;
+      if (has(a, "torpor")) e.ability.push("torpor");
+      e.notes.push("Will sleep for two turns.");
+    } else if (action === "sleep") {
+      a.sleep--;
+      a.guard = false;
+      a.energy += 12;
+      e.healing += heal(s, a, a.maxHP * 0.03 * (has(a, "torpor") ? 1.35 : 1));
+      if (has(a, "torpor")) e.ability.push("torpor");
+      e.notes.push(a.sleep ? `${a.sleep} sleeping turn remains.` : "Wakes up.");
+    } else {
+      let accuracy =
+        move.accuracy +
+        (p.dexterity - q.speed) / 1600 +
+        (a.focus && move.power ? 0.03 : 0);
+      if (action === "lull")
+        accuracy = clamp(0.65 + (p.intellect - q.resolve) / 1800, 0.3, 0.75);
+      if (has(a, "surefoot")) {
+        accuracy += 0.06;
+        e.ability.push("surefoot");
       }
-      if (a.focus) a.focus--;
+      if (has(a, "nightvision") && s.environment.time === "night") {
+        accuracy += 0.05;
+        e.ability.push("nightvision");
+      }
+      e.hit = roll(s, a, action + "|hit") < clamp(accuracy, 0.55, 0.97);
+      if (e.hit) {
+        if (move.power) {
+          let damage =
+            ((46 +
+              0.38 *
+                (move.mental
+                  ? 0.6 * p.intellect + 0.4 * p.dexterity
+                  : p.power)) *
+              move.power *
+              100) /
+            (85 + (move.mental ? 0.32 : 0.6) * q.defense);
+          if (a.focus) damage *= 1.35;
+          if (has(a, "surge") && a.hp <= a.maxHP * 0.3) {
+            damage *= 1.2;
+            e.ability.push("surge");
+          }
+          if (has(a, "insight") && ["feint", "pulse"].includes(action)) {
+            damage *= 1.12;
+            e.ability.push("insight");
+          }
+          if (has(a, "opportunist") && (b.poison || b.slow)) {
+            damage *= 1.12;
+            e.ability.push("opportunist");
+          }
+          if (has(b, "bulwark") && b.hp === b.maxHP) {
+            damage *= 0.72;
+            e.ability.push("bulwark");
+          }
+          if (b.guard) {
+            damage *= move.pierce ? 0.85 : has(b, "bastion") ? 0.35 : 0.45;
+            if (has(b, "bastion") && !move.pierce) e.ability.push("bastion");
+            if (has(a, "breaker")) {
+              damage *= 1.2;
+              e.ability.push("breaker");
+            }
+          }
+          const crit =
+            roll(s, a, action + "|critical") <
+            0.03 + (0.1 * p.dexterity) / (p.dexterity + q.resolve);
+          e.critical = crit && !has(b, "shellguard");
+          if (crit && has(b, "shellguard")) e.ability.push("shellguard");
+          if (e.critical) damage *= 1.25;
+          let amount = Math.max(1, Math.round(damage));
+          if (
+            amount >= b.hp &&
+            has(b, "tenacity") &&
+            !b.saved &&
+            b.hp > b.maxHP * 0.2
+          ) {
+            amount = b.hp - 1;
+            b.saved = true;
+            e.ability.push("tenacity");
+          }
+          e.damage = Math.min(b.hp, amount);
+          b.hp -= e.damage;
+          if (has(a, "siphon")) {
+            e.healing += heal(s, a, e.damage * 0.12);
+            e.ability.push("siphon");
+          }
+          if (move.drain) e.healing += heal(s, a, e.damage * move.drain);
+          if (has(b, "barbs") && move.contact) {
+            const recoil = Math.min(a.hp, Math.round(e.damage * 0.08));
+            a.hp -= recoil;
+            e.recoil = recoil;
+            e.ability.push("barbs");
+          }
+        }
+        if (b.hp > 0 && move.status) {
+          const blocked =
+            (move.status === "poison" && has(b, "antivenom")) ||
+            (move.status === "sleep" && has(b, "wakeful"));
+          if (blocked) {
+            e.ability.push(move.status === "poison" ? "antivenom" : "wakeful");
+            e.notes.push("Status resisted.");
+          } else {
+            b[move.status] = move.status === "sleep" ? 2 : 3;
+            e.notes.push(
+              move.status === "poison"
+                ? "Irritated for three round ends."
+                : move.status === "slow"
+                  ? "Slowed for the next two rounds."
+                  : "Induced sleep.",
+            );
+            if (move.status === "sleep") b.guard = false;
+          }
+        }
+      }
+      if (move.power && a.focus) a.focus--;
     }
-    s.log.push(event);
-    if (b.hp <= 0) {
-      s.finished = true;
-      s.winner = i;
-      s.reason = "knockout";
-      break;
+    a.energy = clamp(a.energy, 0, a.maxEnergy);
+    e.snapshot = snapshot(s);
+    s.log.push(e);
+    endCheck(s);
+    if (s.finished) break;
+  }
+  if (!s.finished) {
+    // Simultaneous upkeep prevents seating order deciding poison/recoil draws.
+    for (const [i, f] of s.fighters.entries()) {
+      const e = {
+        round: s.round,
+        actor: i,
+        action: "upkeep",
+        damage: 0,
+        healing: 0,
+        hit: null,
+        critical: false,
+        ability: [],
+        notes: [],
+      };
+      if (has(f, "shedskin") && s.round % 3 === 0 && (f.poison || f.slow)) {
+        f.poison = 0;
+        f.slow = 0;
+        e.ability.push("shedskin");
+      }
+      if (f.poison) {
+        e.damage = Math.min(f.hp, Math.round(f.maxHP * 0.025));
+        f.hp -= e.damage;
+        f.poison--;
+        e.notes.push("Irritation damage.");
+      }
+      if (f.slow) f.slow--;
+      f.guard = false;
+      if (f.hp > 0) {
+        if (has(f, "renewal") && s.round <= 18 && s.round % 3 === 0) {
+          e.healing += heal(s, f, f.maxHP * 0.03);
+          e.ability.push("renewal");
+        }
+        if (has(f, "dew") && s.environment.terrain === "wetland") {
+          e.healing += heal(s, f, f.maxHP * 0.015);
+          e.ability.push("dew");
+        }
+        f.energy = Math.min(
+          f.maxEnergy,
+          f.energy +
+            5 +
+            (has(f, "sunfeed") && s.environment.time === "day" ? 4 : 0),
+        );
+        if (has(f, "sunfeed") && s.environment.time === "day")
+          e.ability.push("sunfeed");
+      }
+      e.snapshot = snapshot(s);
+      s.log.push(e);
     }
+    endCheck(s);
   }
   if (!s.finished && s.round >= s.maxRounds) {
     s.finished = true;
@@ -396,11 +421,11 @@ export function stepBattle(input, leftAction, rightAction) {
   }
   return s;
 }
+export function finishBattle(initial) {
+  let s = structuredClone(initial);
+  while (!s.finished) s = stepBattle(s);
+  return s;
+}
 export function simulateBattle(left, right, options = {}) {
   return finishBattle(createBattle(left, right, options));
-}
-export function finishBattle(initial) {
-  let state = structuredClone(initial);
-  while (!state.finished) state = stepBattle(state);
-  return state;
 }

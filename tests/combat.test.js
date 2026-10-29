@@ -69,7 +69,7 @@ test("duels are reproducible, bounded, symmetric in seat order and never mutate 
     const x = simulateBattle(a, b, { battleSeed: "trial" }),
       y = simulateBattle(b, a, { battleSeed: "trial" });
     assert.deepEqual(x, simulateBattle(a, b, { battleSeed: "trial" }));
-    assert(x.finished && x.round <= 40 && x.log.length <= 80);
+    assert(x.finished && x.round <= 60 && x.log.length <= 240);
     assert.equal(
       x.winner === null ? null : x.fighters[x.winner].id,
       y.winner === null ? null : y.fighters[y.winner].id,
