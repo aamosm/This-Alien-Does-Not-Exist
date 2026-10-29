@@ -53,7 +53,7 @@ export function battleAdvice(state, selected = "strike") {
   if ((you.poison || you.slow) && can("cleanse"))
     return "Purge clears your irritation and slowing, and heals a little. Find it under More moves.";
   if (you.focus && ACTIONS[selected]?.power)
-    return `Focus is active: your next ${you.focus} damaging attack${you.focus === 1 ? "" : "s"} get 35% more damage. A miss still uses a charge.`;
+    return `Focus is active: your next ${you.focus} damaging attack${you.focus === 1 ? "" : "s"} get${you.focus === 1 ? "s" : ""} 35% more damage. A miss still uses a charge.`;
   if (selected === "focus")
     return "Focus → Lunge gives a stronger hit. Focus → Strike is more reliable. The boost lasts for two damaging attacks; it cannot stack.";
   if (selected === "guard")

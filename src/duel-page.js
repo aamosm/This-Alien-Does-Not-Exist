@@ -37,6 +37,7 @@ let records = null,
   state = null,
   arena = null,
   selected = "strike",
+  inspected = null,
   history = [],
   replay = [],
   replayAt = 0;
@@ -48,6 +49,18 @@ let active = false,
   options = null,
   versions = [2, 2];
 const recentOpponents = [];
+const compactLayout = matchMedia("(max-width: 700px)");
+function placeInspector() {
+  const inspector = $("move-inspector");
+  if (compactLayout.matches)
+    $("play-area").insertBefore(
+      inspector,
+      document.querySelector(".chosen-move"),
+    );
+  else document.querySelector(".battle-sidebar").prepend(inspector);
+}
+compactLayout.addEventListener("change", placeInspector);
+placeInspector();
 const labelButton = (id, text, key) => {
   const button = $(id);
   button.replaceChildren(node("span", text));
@@ -85,6 +98,21 @@ function invalidate() {
   $("notice").textContent =
     "Seeds changed. Select Use these creatures to apply them.";
 }
+function selectPanel(name, focus = false) {
+  for (const id of ["log", "stats"]) {
+    const selectedTab = id === name;
+    $("tab-" + id).setAttribute("aria-selected", String(selectedTab));
+    $("tab-" + id).tabIndex = selectedTab ? 0 : -1;
+    $(id === "log" ? "battle-log" : "comparison").hidden = !selectedTab;
+  }
+  if (focus) $("tab-" + name).focus({ preventScroll: true });
+}
+function inspectFighter(side) {
+  selectPanel("stats");
+  const target = $("stats-fighter-" + side);
+  if (target)
+    $("comparison").scrollTop = target.offsetTop - $("comparison").offsetTop;
+}
 function health(view = state?.fighters) {
   if (!state) return;
   for (let i = 0; i < 2; i++) {
@@ -94,10 +122,16 @@ function health(view = state?.fighters) {
     section.replaceChildren();
     const title = node("div");
     title.className = "fighter-title";
-    title.append(
-      node("strong", i === 0 ? "Your creature" : "Opponent"),
-      node("span", "seed " + short(f.identity.seed)),
+    const inspect = node("button", i === 0 ? "Your creature" : "Opponent");
+    inspect.type = "button";
+    inspect.setAttribute(
+      "aria-label",
+      i === 0 ? "Inspect your creature's stats" : "Inspect opponent's stats",
     );
+    inspect.addEventListener("click", () => inspectFighter(i));
+    const identity = node("span", short(f.identity.seed));
+    identity.title = "Creature seed: " + f.identity.seed;
+    title.append(inspect, identity);
     section.append(title);
     if (f.profile.absolute) {
       section.append(node("p", "No finite ratings."));
@@ -107,12 +141,21 @@ function health(view = state?.fighters) {
       ["Health", v.hp, f.maxHP, ""],
       ["Energy", v.energy, f.maxEnergy, "energy"],
     ]) {
-      const text = node("p", `${label} ${value} / ${max}`);
+      const text = node("p");
       text.className = "meter-label";
+      text.append(node("span", `${label} ${value} / ${max}`));
+      if (!cls) {
+        const percent = node("span", Math.ceil((value / max) * 100) + "%");
+        percent.className = "meter-percent";
+        text.append(percent);
+      }
       const meter = node("progress");
       meter.max = max;
       meter.value = value;
       meter.className = cls;
+      if (!cls)
+        meter.dataset.level =
+          value / max <= 0.2 ? "low" : value / max <= 0.5 ? "mid" : "high";
       meter.setAttribute(
         "aria-label",
         (i === 0 ? "Your " : "Opponent ") + label.toLowerCase(),
@@ -120,14 +163,84 @@ function health(view = state?.fighters) {
       section.append(text, meter);
     }
     const tags = [];
-    if (v.sleep) tags.push(`Asleep · ${v.sleep} turn(s)`);
-    if (v.poison) tags.push(`Irritated · ${v.poison}`);
-    if (v.slow) tags.push(`Slowed · ${v.slow}`);
-    if (v.focus) tags.push(`Focused · ${v.focus} boosted attacks`);
-    const text = node("p", tags.join(" / ") || "Awake · ready");
-    text.className = "status-tags";
-    section.append(text);
+    if (v.sleep)
+      tags.push([
+        `Asleep ${v.sleep}`,
+        "Sleeping turns remaining. You can still be hit.",
+      ]);
+    if (v.poison)
+      tags.push([
+        `Irritated ${v.poison}`,
+        "Round-end irritation ticks remaining.",
+      ]);
+    if (v.slow)
+      tags.push([`Slowed ${v.slow}`, "Rounds of reduced speed remaining."]);
+    if (v.focus)
+      tags.push([
+        `Focus ×${v.focus}`,
+        "Boosted damaging attacks remaining. A miss uses a charge.",
+      ]);
+    const status = node("div");
+    status.className = "status-tags";
+    for (const [label, tip] of tags) {
+      const tag = node("span", label);
+      tag.className = "status-tag";
+      tag.title = tip;
+      status.append(tag);
+    }
+    if (!tags.length) {
+      const ready = node("span", "Awake");
+      ready.className = "status-ready";
+      status.append(ready);
+    }
+    section.append(status);
+    const passives = node("div");
+    passives.className = "passive-row";
+    for (const id of f.profile.abilities) {
+      const ability = node("button", ABILITIES[id].name);
+      ability.type = "button";
+      ability.title = ABILITIES[id].description;
+      ability.addEventListener("click", () => inspectFighter(i));
+      passives.append(ability);
+    }
+    section.append(passives);
   }
+}
+function renderMoveInfo(id = selected) {
+  if (!state) return;
+  const move = ACTIONS[id],
+    check = actionAvailability(state, 0, id);
+  $("inspected-name").textContent = move.name;
+  $("inspection-state").textContent =
+    id === selected ? "Selected" : "Inspecting";
+  $("move-metrics").replaceChildren();
+  for (const [label, value] of [
+    ["Energy", move.cost],
+    ["Power", move.power ? "×" + move.power : "—"],
+    ["Base hit", move.accuracy ? Math.round(move.accuracy * 100) + "%" : "—"],
+  ]) {
+    const pair = node("div");
+    pair.append(node("dt", label), node("dd", String(value)));
+    $("move-metrics").append(pair);
+  }
+  $("move-explanation").textContent =
+    `${move.description}${check.available ? "" : " " + check.reason}`;
+  $("combo-tip").textContent = battleAdvice(state, id);
+}
+function updatePortrait(nextArena, record) {
+  const url = nextArena.portrait(0),
+    image = $("selected-portrait"),
+    icon = $("arena-icon");
+  if (icon.getAttribute("href") !== url) {
+    icon.href = url;
+    image.src = url;
+    image.hidden = false;
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
+      image.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 160 });
+  }
+  icon.dataset.seed = record.identity.seed;
+  icon.dataset.version = String(record.generatorVersion);
+  document.title = `Duel · ${short(record.identity.seed)}`;
 }
 function comparison() {
   const root = $("comparison-content");
@@ -170,6 +283,7 @@ function comparison() {
   for (let i = 0; i < 2; i++) {
     const f = state.fighters[i],
       div = node("section");
+    div.id = "stats-fighter-" + i;
     div.append(
       node("h3", i === 0 ? "Your creature" : "Opponent"),
       node("p", `${f.ecology.cycle} · ${f.ecology.sleepWindow}.`),
@@ -184,29 +298,47 @@ function comparison() {
   }
 }
 function logEvent(e) {
+  if (e.action === "upkeep" && !e.damage && !e.healing && !e.ability.length)
+    return;
+  $("log-empty").hidden = true;
+  const panel = $("battle-log");
+  const atBottom =
+    panel.scrollHeight - panel.clientHeight - panel.scrollTop < 48;
+  if (!$("events").querySelector(`[data-round="${e.round}"]`)) {
+    const heading = node("li", "Round " + e.round);
+    heading.className = "round-divider";
+    heading.dataset.round = e.round;
+    $("events").append(heading);
+  }
   const who = e.actor === 0 ? "You" : "Opponent",
     move = ACTIONS[e.action]?.name ?? "Round end";
-  let text = `${e.round}. ${who} · ${move}`;
-  if (e.hit === false) text += " — missed";
+  const line = node("li");
+  line.className = "event";
+  line.dataset.roundEvent = e.round;
+  line.append(node("strong", `${who} · ${move}`));
+  let effect = "";
+  if (e.hit === false) effect += " — missed";
   if (e.damage)
-    text +=
+    effect +=
       e.action === "upkeep"
         ? ` — takes ${e.damage} irritation damage`
         : ` — deals ${e.damage} damage${e.critical ? " (critical)" : ""}`;
-  if (e.healing) text += ` · heals ${e.healing}`;
-  if (e.recoil) text += ` · takes ${e.recoil} reflected damage`;
+  if (e.healing) effect += ` · heals ${e.healing}`;
+  if (e.recoil) effect += ` · takes ${e.recoil} reflected damage`;
   if (e.ability.length)
-    text +=
+    effect +=
       " · " +
       [...new Set(e.ability)].map((id) => ABILITIES[id].name).join(", ");
-  if (e.notes.length) text += " · " + e.notes.join(" ");
-  if (e.action !== "upkeep" || e.damage || e.healing || e.ability.length)
-    $("events").append(node("li", text));
-  $("events").scrollTop = $("events").scrollHeight;
+  if (e.notes.length) effect += " · " + e.notes.join(" ");
+  const effects = node("span", effect);
+  effects.className = "log-effect";
+  line.append(effects);
+  $("events").append(line);
+  if (atBottom) panel.scrollTop = panel.scrollHeight;
 }
-function update() {
+function update(focusId = null) {
   if (!state) return;
-  const focusMove = document.activeElement?.dataset.move;
+  const focusMove = focusId ?? document.activeElement?.dataset.move;
   health();
   comparison();
   $("begin").hidden = active || state.finished;
@@ -250,6 +382,7 @@ function update() {
   if (sleeping) selected = "sleep";
   else if (selected === "sleep") selected = "strike";
   const moves = new Map(availableActions(state, 0).map((m) => [m.id, m]));
+  inspected = null;
   $("moves").replaceChildren();
   $("extra-moves").replaceChildren();
   $("more-moves").hidden = sleeping;
@@ -269,24 +402,53 @@ function update() {
       title.className = "move-title";
       title.append(node("span", m.name));
       if (MOVE_KEYS[id]) title.append(node("kbd", MOVE_KEYS[id].toUpperCase()));
-      const note = node("span", MOVE_NOTES[id]);
-      note.className = "move-note";
-      const cost = node("span", m.available ? `${m.cost} energy` : m.reason);
+      const meta = node("span");
+      meta.className = "move-meta";
+      const category = m.contact
+        ? "Contact"
+        : m.mental
+          ? "Mental"
+          : m.power
+            ? "Ranged"
+            : ["recover", "rest", "cleanse", "sleep"].includes(id)
+              ? "Recovery"
+              : "Tactical";
+      const cost = node("span", m.cost + " energy");
       cost.className = "move-cost";
-      b.append(title, note, cost);
+      meta.append(node("span", category), cost);
+      b.append(title, meta);
+      b.title = MOVE_NOTES[id] + " — " + m.description;
+      if (!m.available) {
+        const lock = node("span", m.reason);
+        lock.className = "move-lock";
+        b.append(lock);
+      }
       b.disabled = busy || auto || replayAt < replay.length;
       b.addEventListener("click", () => {
         selected = id;
+        inspected = null;
         update();
       });
+      const inspect = () => {
+        inspected = id;
+        renderMoveInfo(id);
+      };
+      const restore = () => {
+        inspected = null;
+        renderMoveInfo();
+      };
+      b.addEventListener("pointerenter", inspect);
+      b.addEventListener("pointerleave", restore);
+      b.addEventListener("focus", inspect);
+      b.addEventListener("blur", restore);
       $(root).append(b);
     }
   }
   const m = ACTIONS[selected],
     check = actionAvailability(state, 0, selected);
-  $("move-explanation").textContent =
-    `${m.name} · ${m.cost} energy. ${m.description}${check.available ? "" : " " + check.reason}`;
-  $("combo-tip").textContent = battleAdvice(state, selected);
+  $("chosen-label").textContent = m.name;
+  $("chosen-cost").textContent = `${m.cost} energy`;
+  renderMoveInfo();
   const recorded = replayAt < replay.length;
   labelButton(
     "play-round",
@@ -358,7 +520,10 @@ async function preview(loadedReplay = []) {
     replay = loadedReplay;
     replayAt = 0;
     $("events").replaceChildren();
+    $("log-empty").hidden = false;
+    updatePortrait(nextArena, records[0]);
     $("encounter").hidden = false;
+    selectPanel("log");
     const habitat = conditions(state.fighters[0], state.environment);
     const changes = Object.entries(habitat.bonuses)
       .filter(([, value]) => Math.abs(value - 1) >= 0.005)
@@ -369,6 +534,9 @@ async function preview(loadedReplay = []) {
     $("conditions").textContent =
       `${TERRAINS[state.environment.terrain].name} · ${TIMES[state.environment.time]} — your ${changes.join(", ") || "ratings are unchanged"}.`;
     $("conditions").title = TERRAINS[state.environment.terrain].description;
+    $("field-condition").textContent =
+      `${TERRAINS[state.environment.terrain].name} · ${TIMES[state.environment.time]}`;
+    $("field-condition").title = $("conditions").textContent;
     $("last-event").textContent =
       "You play on the left. Choose a move each round; the computer chooses for the opponent.";
     recentOpponents.push(records[1].identity.seed);
@@ -388,6 +556,11 @@ async function preview(loadedReplay = []) {
       state = null;
       records = null;
       $("new-opponent").disabled = false;
+      $("arena-icon").href = "data:,";
+      delete $("arena-icon").dataset.seed;
+      delete $("arena-icon").dataset.version;
+      $("selected-portrait").hidden = true;
+      document.title = "Duel · This Alien Doesn't Exist";
     }
   }
 }
@@ -412,7 +585,7 @@ async function playRound() {
       if (token !== generation) return;
       health(event.snapshot);
       logEvent(event);
-      const latest = Array.from($("events").children)
+      const latest = Array.from($("events").querySelectorAll("li.event"))
         .slice(-2)
         .map((item) => item.textContent.replace(/^\d+\. /, ""));
       $("last-event").textContent = latest.join(" · ");
@@ -458,7 +631,7 @@ function selectMove(id) {
     return;
   selected = id;
   if (EXTRA_MOVES.includes(id)) $("more-moves").open = true;
-  update();
+  update(id);
 }
 function toggleAuto() {
   if (!state || state.finished || !active) return;
@@ -496,6 +669,23 @@ async function newOpponent() {
   } catch (error) {
     $("notice").textContent = error.message;
   }
+}
+for (const name of ["log", "stats"]) {
+  $("tab-" + name).addEventListener("click", () => selectPanel(name));
+  $("tab-" + name).addEventListener("keydown", (event) => {
+    if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+      event.preventDefault();
+      const next =
+        event.key === "Home"
+          ? "log"
+          : event.key === "End"
+            ? "stats"
+            : name === "log"
+              ? "stats"
+              : "log";
+      selectPanel(next, true);
+    }
+  });
 }
 $("setup").addEventListener("submit", (e) => {
   e.preventDefault();

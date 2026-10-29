@@ -451,6 +451,49 @@ export async function createArena(
   draw();
   return {
     draw,
+    portrait(index = 0, size = 64) {
+      const texture = textures[index];
+      if (!texture) throw new RangeError("Unknown fighter.");
+      const pixels = texture
+        .getContext("2d")
+        .getImageData(0, 0, SIZE, SIZE).data;
+      let left = SIZE,
+        top = SIZE,
+        right = 0,
+        bottom = 0;
+      for (let y = 0; y < SIZE; y++)
+        for (let x = 0; x < SIZE; x++) {
+          if (pixels[(y * SIZE + x) * 4 + 3] > 24) {
+            left = Math.min(left, x);
+            top = Math.min(top, y);
+            right = Math.max(right, x);
+            bottom = Math.max(bottom, y);
+          }
+        }
+      const icon = document.createElement("canvas");
+      icon.width = icon.height = size;
+      if (left <= right && top <= bottom) {
+        const width = right - left + 1,
+          height = bottom - top + 1;
+        const scale = (size * 0.88) / Math.max(width, height);
+        const dw = width * scale,
+          dh = height * scale;
+        icon
+          .getContext("2d")
+          .drawImage(
+            texture,
+            left,
+            top,
+            width,
+            height,
+            (size - dw) / 2,
+            (size - dh) / 2,
+            dw,
+            dh,
+          );
+      }
+      return icon.toDataURL("image/png");
+    },
     cancel() {
       cancelled = true;
     },

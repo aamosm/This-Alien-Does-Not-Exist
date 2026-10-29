@@ -344,21 +344,216 @@ test("visible shortcuts select, play, pause and explain combos without firing in
 test("every move renders its own motion without canvas or browser errors", async () => {
   const { page, context, errors } = await open();
   const rendered = await page.evaluate(async () => {
-    const { generate } = await import('./src/engine.js');
-    const { createArena } = await import('./src/duel-motion.js');
-    const { ACTIONS } = await import('./src/combat.js');
-    const canvas = document.querySelector('#arena');
-    const arena = await createArena(canvas, [generate('42'), generate('17')], { terrain: 'plain', time: 'day' });
+    const { generate } = await import("./src/engine.js");
+    const { createArena } = await import("./src/duel-motion.js");
+    const { ACTIONS } = await import("./src/combat.js");
+    const canvas = document.querySelector("#arena");
+    const arena = await createArena(canvas, [generate("42"), generate("17")], {
+      terrain: "plain",
+      time: "day",
+    });
     const views = new Set();
     for (const [action, move] of Object.entries(ACTIONS)) {
-      arena.draw({ actor: 0, action, hit: true, damage: move.power ? 42 : 0, healing: ['rest', 'sleep', 'drain'].includes(action) ? 14 : 0 }, .55);
+      arena.draw(
+        {
+          actor: 0,
+          action,
+          hit: true,
+          damage: move.power ? 42 : 0,
+          healing: ["rest", "sleep", "drain"].includes(action) ? 14 : 0,
+        },
+        0.55,
+      );
       views.add(canvas.toDataURL());
     }
-    arena.draw({ actor: 0, action: 'lunge', damage: 42, hit: true }, .48);
+    arena.draw({ actor: 0, action: "lunge", damage: 42, hit: true }, 0.48);
     return views.size;
   });
   assert(rendered >= 12);
-  await page.screenshot({ path: '.test-output/duel-lunge.png', fullPage: true });
+  await page.screenshot({
+    path: ".test-output/duel-lunge.png",
+    fullPage: true,
+  });
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("battlefield, controls and persistent log stay together; inspecting a move never commits it", async () => {
+  const { page, context, errors } = await open(undefined, {
+    reducedMotion: "reduce",
+  });
+  const field = await page.locator(".battle-field").boundingBox();
+  const controls = await page.locator(".controls").boundingBox();
+  const log = await page.locator("#battle-log").boundingBox();
+  assert(controls.y >= field.y + field.height);
+  assert(log.x >= field.x + field.width);
+  assert.equal(await page.locator("#fighter-0 .passive-row button").count(), 2);
+  assert.equal(
+    await page.locator("#fighter-0 .meter-percent").innerText(),
+    "100%",
+  );
+  await page.locator('[data-move="lunge"]').hover();
+  assert.equal(await page.locator("#inspected-name").innerText(), "Lunge");
+  assert.equal(
+    await page.locator("#inspection-state").innerText(),
+    "Inspecting",
+  );
+  assert.equal(await page.locator("#chosen-label").innerText(), "Strike");
+  assert.match(await page.locator("#move-metrics").innerText(), /78%/);
+  assert.equal(
+    await page.locator("#round-status").innerText(),
+    "Ready to begin",
+  );
+  await page.locator('[data-move="strike"]').click();
+  await page.keyboard.press("2");
+  assert.equal(await page.locator("#inspected-name").innerText(), "Lunge");
+  assert.equal(await page.locator("#chosen-label").innerText(), "Lunge");
+  await page.locator("#fighter-0 .passive-row button").first().click();
+  assert(await page.locator("#comparison").isVisible());
+  assert.equal(
+    await page.locator("#tab-stats").getAttribute("aria-selected"),
+    "true",
+  );
+  await page.locator("#tab-stats").focus();
+  await page.keyboard.press("ArrowLeft");
+  assert(await page.locator("#battle-log").isVisible());
+  await page.locator("#begin").click();
+  await round(page, "strike");
+  assert.equal(await page.locator("#events .round-divider").count(), 1);
+  assert.equal(
+    await page.locator("#events .round-divider").innerText(),
+    "Round 1",
+  );
+  assert(await page.locator("#log-empty").isHidden());
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const inspector = await page.locator("#move-inspector").boundingBox();
+    const play = await page.locator("#play-round").boundingBox();
+    assert(inspector.y + inspector.height <= play.y);
+    assert(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    );
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.waitForFunction(
+    () => !!document.querySelector(".battle-sidebar #move-inspector"),
+  );
+  await page.setViewportSize({ width: 1366, height: 768 });
+  const laptopButton = await page.locator("#play-round").boundingBox();
+  assert(laptopButton.y + laptopButton.height <= 768);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("favicon uses the selected creature portrait and survives opponent changes and replay", async () => {
+  const { page, context, errors } = await open(undefined, {
+    reducedMotion: "reduce",
+  });
+  const first = await page.locator("#arena-icon").getAttribute("href");
+  assert(first.startsWith("data:image/png;base64,"));
+  assert.equal(
+    await page.locator("#selected-portrait").getAttribute("src"),
+    first,
+  );
+  const expected = await page.evaluate(async () => {
+    const { generate } = await import("./src/engine.js");
+    const { createArena } = await import("./src/duel-motion.js");
+    const a = await createArena(
+      document.createElement("canvas"),
+      [generate("42"), generate("17")],
+      { terrain: "plain", time: "day" },
+    );
+    const portraits = [a.portrait(0), a.portrait(1)];
+    a.cancel();
+    return portraits;
+  });
+  assert.equal(first, expected[0]);
+  assert.notEqual(first, expected[1]);
+  const visiblePixels = await page.evaluate(async () => {
+    const image = new Image();
+    image.src = document.querySelector("#arena-icon").href;
+    await image.decode();
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(image, 0, 0);
+    return Array.from(ctx.getImageData(0, 0, 64, 64).data).filter(
+      (v, i) => i % 4 === 3 && v > 0,
+    ).length;
+  });
+  assert(visiblePixels > 50 && visiblePixels < 4096);
+  await page.locator("#new-opponent").click();
+  await page.waitForFunction(
+    () => !document.querySelector("#encounter").hidden,
+  );
+  assert.equal(await page.locator("#arena-icon").getAttribute("href"), first);
+  await page.locator("#setup-panel > summary").click();
+  let previous = first;
+  for (const seed of ["99", "3", "31415926535897", "circle", "42"]) {
+    await page.locator("#left-seed").fill(seed);
+    await page.locator("#preview").click();
+    await page.waitForFunction(
+      () => !document.querySelector("#encounter").hidden,
+    );
+    const next = await page.locator("#arena-icon").getAttribute("href");
+    assert(next.startsWith("data:image/png;base64,"));
+    assert.notEqual(next, previous);
+    previous = next;
+  }
+  assert.equal(previous, first);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("legacy and cancelled previews cannot leave a stale favicon; invalid seeds clear it", async () => {
+  const { page, context, errors } = await open(
+    "?left=42&right=17&lv=1&battle=legacy-icon",
+  );
+  assert.equal(
+    await page.locator("#arena-icon").getAttribute("data-version"),
+    "1",
+  );
+  assert(
+    (await page.locator("#arena-icon").getAttribute("href")).startsWith(
+      "data:image/png;base64,",
+    ),
+  );
+  await page.goto(origin + "/duel.html?left=43&right=17&lv=1&battle=race", {
+    waitUntil: "domcontentloaded",
+  });
+  await page.locator("#setup-panel > summary").click();
+  await page.locator("#left-seed").fill("99");
+  await page.locator("#preview").click();
+  await page.waitForFunction(
+    () => document.querySelector("#arena-icon").dataset.seed === "99",
+  );
+  const latest = await page.locator("#arena-icon").getAttribute("href");
+  await page.waitForTimeout(800);
+  assert.equal(await page.locator("#arena-icon").getAttribute("href"), latest);
+  assert.equal(
+    await page.locator("#arena-icon").getAttribute("data-version"),
+    "2",
+  );
+  await page.locator("#left-seed").fill((P_D + 1n).toString());
+  await page.locator("#preview").click();
+  await page.waitForFunction(() =>
+    document.querySelector("#notice").textContent.includes("large"),
+  );
+  assert.equal(
+    await page.locator("#arena-icon").getAttribute("href"),
+    "data:,",
+  );
+  assert(await page.locator("#selected-portrait").isHidden());
+  await page.goto(
+    pathToFileURL(path.resolve("duel.html")).href +
+      "#left=99&right=17&battle=offline",
+  );
+  await page.waitForFunction(
+    () => document.querySelector("#arena-icon").dataset.seed === "99",
+  );
+  assert.equal(await page.locator("#arena-icon").getAttribute("href"), latest);
   assert.deepEqual(errors, []);
   await context.close();
 });

@@ -5,14 +5,28 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#0a0a0a" />
     <title>Duel · This Alien Doesn't Exist</title>
-    <link id="arena-icon" rel="icon" href="data:," />
+    <link
+      id="arena-icon"
+      rel="icon"
+      type="image/png"
+      sizes="64x64"
+      href="data:,"
+    />
     <style data-bundle="duel"></style>
   </head>
   <body>
     <main>
       <header>
         <a id="back-link" href="index.html">← Generator</a>
-        <h1>Duel</h1>
+        <h1>
+          <img
+            id="selected-portrait"
+            width="28"
+            height="28"
+            alt=""
+            hidden
+          />Duel
+        </h1>
         <button
           id="help-toggle"
           type="button"
@@ -86,74 +100,133 @@
       <p id="notice" role="status" aria-live="polite"></p>
       <section id="encounter" hidden>
         <div class="duel-layout">
-          <section class="arena-side" aria-label="Battle">
-            <div class="fighters">
-              <section id="fighter-0" aria-label="Your creature"></section>
-              <section id="fighter-1" aria-label="Opponent"></section>
-            </div>
-            <canvas
-              id="arena"
-              width="1000"
-              height="480"
-              role="img"
-              aria-label="Your creature on the left; computer opponent on the right"
-            ></canvas>
-            <div class="battle-heading">
+          <section class="battle-column" aria-label="Battle and moves">
+            <div class="field-header">
               <h2 id="round-status" aria-live="polite">Ready to begin</h2>
-              <span id="turn-order" class="muted"></span>
+              <span id="turn-order"></span>
+            </div>
+            <div class="battle-field">
+              <div class="fighters">
+                <section id="fighter-0" aria-label="Your creature"></section>
+                <section id="fighter-1" aria-label="Opponent"></section>
+              </div>
+              <canvas
+                id="arena"
+                width="1000"
+                height="480"
+                role="img"
+                aria-label="Your creature on the left; computer opponent on the right"
+              ></canvas>
+              <p id="field-condition"></p>
             </div>
             <p id="last-event" aria-live="polite">
-              You play on the left. Choose a move each round; the computer
-              chooses for the opponent.
+              You play on the left. Choose a move each round.
             </p>
-            <p id="conditions" class="muted"></p>
-            <details id="battle-log">
-              <summary>Battle log</summary>
-              <ol id="events" aria-live="off"></ol>
-            </details>
-          </section>
-          <aside class="controls" aria-label="Your moves">
-            <div class="control-heading">
-              <h2>Your move</h2>
-              <span class="muted">Keys select · Enter plays</span>
-            </div>
-            <div id="play-area">
-              <div id="moves" role="group" aria-label="Main moves"></div>
-              <details id="more-moves">
-                <summary>
-                  More moves <span class="muted">· slow, irritate, heal…</span>
-                </summary>
-                <div
-                  id="extra-moves"
-                  role="group"
-                  aria-label="More moves"
-                ></div>
-              </details>
-              <div class="chosen-move">
-                <p id="move-explanation"></p>
-                <button id="begin" class="primary" type="button">
-                  Start fight <kbd>Enter</kbd>
-                </button>
-                <button id="play-round" class="primary" type="button">
-                  Use Strike <kbd>Enter</kbd>
-                </button>
+            <section class="controls" aria-label="Choose an action">
+              <div class="control-heading">
+                <h2>Choose a move</h2>
+                <span>Keys select · Enter plays</span>
               </div>
+              <div id="play-area">
+                <div id="moves" role="group" aria-label="Main moves"></div>
+                <details id="more-moves">
+                  <summary>
+                    More moves <span>· slow, irritate, heal</span>
+                  </summary>
+                  <div
+                    id="extra-moves"
+                    role="group"
+                    aria-label="More moves"
+                  ></div>
+                </details>
+                <div class="chosen-move">
+                  <div>
+                    <strong id="chosen-label">Strike</strong
+                    ><span id="chosen-cost"></span>
+                  </div>
+                  <button id="begin" class="primary" type="button">
+                    Start fight <kbd>Enter</kbd>
+                  </button>
+                  <button id="play-round" class="primary" type="button">
+                    Use Strike <kbd>Enter</kbd>
+                  </button>
+                </div>
+              </div>
+              <p id="result-tip" hidden>
+                Try a different approach with Rematch, or find a new opponent.
+              </p>
+              <div class="play-tools">
+                <button id="autoplay" type="button" hidden>
+                  Auto <kbd>A</kbd>
+                </button>
+                <button id="reset" type="button">Rematch</button>
+                <button id="copy-encounter" type="button">Share</button>
+              </div>
+            </section>
+          </section>
+          <aside class="battle-sidebar" aria-label="Battle information">
+            <section
+              id="move-inspector"
+              aria-label="Move details"
+              aria-live="polite"
+            >
+              <div class="inspector-heading">
+                <h2 id="inspected-name">Strike</h2>
+                <span id="inspection-state">Selected</span>
+              </div>
+              <dl id="move-metrics"></dl>
+              <p id="move-explanation"></p>
               <p id="combo-tip"></p>
-            </div>
-            <p id="result-tip" hidden>
-              Try a different approach with Rematch, or find a new opponent.
-            </p>
-            <div class="play-tools">
-              <button id="autoplay" type="button" hidden>
-                Auto <kbd>A</kbd>
+            </section>
+            <div
+              class="side-tabs"
+              role="tablist"
+              aria-label="Battle information"
+            >
+              <button
+                id="tab-log"
+                role="tab"
+                type="button"
+                aria-selected="true"
+                aria-controls="battle-log"
+              >
+                Battle log
               </button>
-              <button id="reset" type="button">Rematch</button>
-              <button id="copy-encounter" type="button">Share</button>
+              <button
+                id="tab-stats"
+                role="tab"
+                type="button"
+                aria-selected="false"
+                aria-controls="comparison"
+                tabindex="-1"
+              >
+                Stats &amp; abilities
+              </button>
             </div>
-            <details id="comparison">
-              <summary>Stats &amp; passive abilities</summary>
+            <section
+              id="battle-log"
+              class="side-content"
+              role="tabpanel"
+              aria-labelledby="tab-log"
+              tabindex="0"
+            >
+              <p id="log-empty">
+                The battle starts when you do. Each round and its effects will
+                appear here.
+              </p>
+              <ol id="events" aria-live="off"></ol>
+            </section>
+            <section
+              id="comparison"
+              class="side-content"
+              role="tabpanel"
+              aria-labelledby="tab-stats"
+              tabindex="0"
+              hidden
+            >
+              <p id="conditions"></p>
               <div id="comparison-content"></div>
-            </details>
+            </section>
           </aside>
         </div>
       </section>
@@ -168,9 +241,12 @@
           Guard protects for the whole round.
         </p>
         <p>
-          Select a move with a click or its key, then press Enter to use it.
-          Energy pays for moves. Breathe restores energy; Rest heals, but leaves
-          you asleep for two turns. Passive abilities work automatically.
+          Hover or focus a move to inspect it. Select it with a click or its
+          key, then press Enter to use it. Energy pays for moves. Breathe
+          restores energy; Rest heals, but leaves you asleep for two turns.
+          Passive abilities work automatically. They appear under each health
+          bar; click a creature or ability to open its stats. The battle log
+          records each turn and its effects.
         </p>
         <p>
           <strong>Try a sequence.</strong> Focus → Strike boosts two attacks.
