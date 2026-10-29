@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#101617" />
+    <title>Alien Duel</title>
+    <link id="arena-icon" rel="icon" href="data:," />
+    <style>
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <a id="back-link" href="index.html">← Specimens</a
+        ><span>FIELD SIMULATION / DUEL</span
+        ><button id="help-toggle" type="button">How to play</button>
+      </header>
+      <section class="intro">
+        <h1>Two creatures. One encounter.</h1>
+        <p>
+          Pick your specimen, set the conditions, then choose one move per
+          round.
+        </p>
+      </section>
+      <details id="help">
+        <summary>How this encounter works</summary>
+        <div class="help-grid">
+          <p>
+            <strong>1. Creature seeds identify fighters.</strong> They determine
+            anatomy, ratings, two passive abilities and activity preference. You
+            control the left creature; the computer controls the right.
+          </p>
+          <p>
+            <strong>2. Choose an arena.</strong> Terrain and time give small,
+            visible advantages. “From encounter code” selects them reproducibly.
+            Creatures start awake, even outside their preferred active hours.
+          </p>
+          <p>
+            <strong>3. Select a move, then play the round.</strong> Both
+            creatures commit before either acts. Speed determines attack order.
+            Guard protects for the whole round. Health reaching zero ends the
+            fight; energy pays for moves.
+          </p>
+          <p>
+            <strong>4. The encounter code controls chance.</strong> It is not a
+            creature seed or a power level. Same creatures, code, terrain, time,
+            rules and move sequence give the same outcome. Changing your moves
+            can change the winner. “New code” creates a different encounter.
+          </p>
+          <p>
+            <strong>Sleep and recovery.</strong> Breathe restores energy only.
+            Rest heals but leaves you asleep for two turns. While asleep, use
+            the Sleep button to advance a round. Passives trigger automatically;
+            their effects appear in the log.
+          </p>
+          <p>
+            <strong>Autoplay plays visibly.</strong> Pause stops before the next
+            round. Replay links retain the moves already played. After round 30
+            healing is halved; after round 45 it stops. Unfinished fights draw
+            after 60 rounds.
+          </p>
+        </div>
+      </details>
+      <details id="setup-panel" open>
+        <summary>Encounter settings</summary>
+        <form id="setup">
+          <div class="setup-grid">
+            <label
+              >Your creature seed<input
+                id="left-seed"
+                value="42"
+                required
+                autocomplete="off"
+                maxlength="1100" /></label
+            ><label
+              >Opponent seed<input
+                id="right-seed"
+                value="17"
+                required
+                autocomplete="off"
+                maxlength="1100"
+            /></label>
+            <label
+              >Terrain<select id="terrain">
+                <option value="random">From encounter code</option>
+              </select></label
+            ><label
+              >Time<select id="time">
+                <option value="random">From encounter code</option>
+              </select></label
+            >
+          </div>
+          <div class="encounter-row">
+            <label
+              >Encounter code<input
+                id="encounter-code"
+                maxlength="64"
+                required
+                aria-describedby="code-help" /></label
+            ><button id="new-code" type="button">New code</button
+            ><button id="preview" type="submit">Preview encounter</button>
+          </div>
+          <p class="muted" id="code-help">
+            Controls chance and automatic conditions—not creature strength.
+            Preview applies your settings and resets the fight.
+          </p>
+        </form>
+      </details>
+      <p id="notice" role="status" aria-live="polite"></p>
+      <section id="encounter" hidden>
+        <div class="arena-heading">
+          <p id="conditions"></p>
+          <button id="copy-encounter" type="button">Copy encounter link</button>
+        </div>
+        <div class="fighters">
+          <section id="fighter-0" aria-label="Your creature"></section>
+          <section id="fighter-1" aria-label="Opponent"></section>
+        </div>
+        <canvas
+          id="arena"
+          width="1000"
+          height="430"
+          role="img"
+          aria-label="Your creature on the left; opponent on the right"
+        ></canvas>
+        <div class="battle-heading">
+          <h2 id="round-status" aria-live="polite">Ready</h2>
+          <div>
+            <button id="begin" type="button">Start duel</button
+            ><button id="autoplay" type="button" hidden>Autoplay</button
+            ><button id="reset" type="button">Reset encounter</button>
+          </div>
+        </div>
+        <div id="play-area" hidden>
+          <p class="muted">
+            Select a move to inspect it. Then play one round. The opponent
+            chooses independently.
+          </p>
+          <div id="moves" role="group" aria-label="Choose your move"></div>
+          <div class="chosen-move">
+            <p id="move-explanation"></p>
+            <button id="play-round" type="button">Play round</button>
+          </div>
+        </div>
+        <details id="comparison">
+          <summary>Compare ratings, activity and passive abilities</summary>
+          <div id="comparison-content"></div>
+        </details>
+        <details id="battle-log" open>
+          <summary>Round-by-round record</summary>
+          <ol id="events" aria-live="off"></ol>
+        </details>
+      </section>
+      <details id="field-manual">
+        <summary>
+          Field manual · ratings, moves and all 24 passive abilities
+        </summary>
+        <div id="manual-content"></div>
+      </details>
+      <footer>
+        Fictional ecological combat model · no elemental types · simulated on
+        your device.
+      </footer>
+    </main>
+    <script>
+    </script>
+  </body>
+</html>

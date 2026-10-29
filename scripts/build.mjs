@@ -53,3 +53,17 @@ await writeFile(
   root + "api.html",
   `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Alien data</title><style>body{margin:24px;background:#111;color:#ddd;font:13px/1.6 monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><pre>Static API bridge. Import alien-api.js for a JavaScript API, or use ?op=generate&amp;v=2&amp;seed=42. This page executes in the browser; it is not an HTTP JSON endpoint.</pre><script type="module">${apiPage.replace(/<\/script/gi, "<\\/script")}</script></html>`,
 );
+
+const duelApp = (await build({ ...options, entryPoints: ["src/duel-page.js"] }))
+  .outputFiles[0].text;
+const duelTemplate = await readFile(root + "src/duel.template.html", "utf8");
+const duelCSS = await readFile(root + "duel.css", "utf8");
+await writeFile(
+  root + "duel.html",
+  duelTemplate
+    .replace("/* DUEL_STYLE */", () => duelCSS)
+    .replace("/* DUEL_SCRIPT */", () =>
+      duelApp.replace(/<\/script/gi, "<\\/script"),
+    ),
+);
+console.log("Built self-contained duel.html.");

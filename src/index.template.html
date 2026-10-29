@@ -20,7 +20,7 @@
       <nav class="toolbar" aria-label="Alien tools">
         <button id="open-search" type="button">Search &amp; filters</button>
         <button id="open-save" type="button" disabled>Save…</button>
-        <button id="open-duel" type="button" disabled>Duel…</button>
+        <button id="open-duel" type="button" disabled>Duel ↗</button>
         <label class="render-choice"
           >Render<select id="render-mode">
             <option value="skin">Skin</option>
@@ -85,48 +85,6 @@
         </aside>
       </section>
     </main>
-    <dialog id="duel-dialog" aria-labelledby="duel-title">
-      <div class="dialog-heading">
-        <h2 id="duel-title">Duel</h2>
-        <button id="close-duel" type="button">Close</button>
-      </div>
-      <form id="opponent-form">
-        <label for="opponent-seed">Opponent seed</label>
-        <div class="opponent-row">
-          <input
-            id="opponent-seed"
-            type="text"
-            autocomplete="off"
-            required
-          /><button type="submit">Compare</button>
-        </div>
-      </form>
-      <div id="duel-comparison"></div>
-      <label class="small" for="battle-seed"
-        >Match seed · same matchup and actions replay the same outcome</label
-      >
-      <input id="battle-seed" type="text" value="0" maxlength="128" />
-      <button id="duel-start" type="button" disabled>Start duel</button>
-      <p id="duel-status" role="status" aria-live="polite"></p>
-      <div id="duel-health"></div>
-      <div id="duel-controls" hidden>
-        <div id="duel-actions"></div>
-        <button id="duel-auto" type="button">Auto resolve</button>
-      </div>
-      <details id="duel-help">
-        <summary>Rules &amp; actions</summary>
-        <p>
-          Two actions per round, faster specimen first. Damage uses stats and
-          passives; there are no types. Recovery has a cooldown. Unfinished
-          contests draw after 40 rounds. ↑ marks the stronger stat, not a
-          guaranteed winner.
-        </p>
-      </details>
-      <details>
-        <summary>Battle log</summary>
-        <ol id="duel-log"></ol>
-      </details>
-    </dialog>
     <dialog id="save-dialog" aria-labelledby="save-title">
       <div class="dialog-heading">
         <h2 id="save-title">Save</h2>

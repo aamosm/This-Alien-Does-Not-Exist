@@ -11,7 +11,7 @@
   "scripts": {
     "start": "node scripts/serve.mjs",
     "test": "node --test tests/*.test.js",
-    "test:browser": "node --test tests/browser.test.mjs",
+    "test:browser": "node --test tests/browser.test.mjs tests/duel-browser.mjs",
     "audit": "node scripts/audit.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "catalogue": "node scripts/catalogue.mjs",

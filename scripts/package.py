@@ -9,7 +9,7 @@ root = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--out', type=Path, default=root / 'dist' / 'This-Alien-Does-Not-Exist.zip')
 args = parser.parse_args()
-files = ['alien-api.js', 'api.html', 'index.html', '404.html', 'styles.css', 'README.md', 'LICENSE', 'CNAME',
+files = ['duel.html', 'duel.css', 'alien-api.js', 'api.html', 'index.html', '404.html', 'styles.css', 'README.md', 'LICENSE', 'CNAME',
          '.nojekyll', '.gitattributes', '.gitignore', 'package.json', 'package-lock.json']
 for folder in ['src', 'legacy', 'scripts', 'tests', 'docs']:
     files.extend(str(p.relative_to(root)) for p in (root / folder).rglob('*')

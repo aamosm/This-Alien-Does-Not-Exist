@@ -548,57 +548,26 @@ test("related results vary in anatomy and keep the hidden sequence out of the in
   await context.close();
 });
 
-test("combat remains collapsed, compares stats, plays turns and handles the final disc without stats", async () => {
+test("combat ratings stay collapsed and Duel opens the separate arena with the current identity", async () => {
   const { page, context, errors } = await opened();
   assert.equal(await page.locator("#combat-stats").getAttribute("open"), null);
   await page.locator("#combat-stats summary").click();
   assert.equal(await page.locator("#combat-values strong").count(), 8);
+  assert.equal(await page.locator("#duel-dialog").count(), 0);
   await page.locator("#open-duel").click();
-  await page.locator("#opponent-seed").fill("3");
-  await page.locator("#opponent-form").evaluate((f) => f.requestSubmit());
-  assert.equal(await page.locator("#duel-comparison tbody tr").count(), 8);
-  assert((await page.locator("#duel-comparison").innerText()).includes("↑"));
-  await page.locator("#duel-start").click();
-  await page.locator('[data-action="focus"]').click();
-  assert.match(await page.locator("#duel-status").innerText(), /Round 1/);
-  await page.locator('[data-action="strike"]').click();
-  assert((await page.locator("#duel-log li").count()) >= 3);
-  await page.locator("#duel-auto").click();
-  assert.match(await page.locator("#duel-status").innerText(), /wins|Draw/);
-  const result = await page.locator("#duel-status").innerText();
-  await page.screenshot({ path: ".test-output/combat-desktop.png" });
-  await page.setViewportSize({ width: 390, height: 844 });
-  assert(
-    await page
-      .locator("#duel-dialog")
-      .evaluate((d) => d.scrollWidth <= d.clientWidth),
-  );
-  assert(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  );
-  await page.screenshot({ path: ".test-output/combat-mobile.png" });
-  await page.locator("#close-duel").click();
+  await page.waitForURL(/duel.html/);
+  await page.waitForFunction(() => !document.querySelector('#encounter').hidden);
+  assert.equal(await page.locator('#left-seed').inputValue(), '42');
+  assert.equal(await page.locator('#round-status').innerText(), 'Ready to begin');
+  await page.locator('#back-link').click();
+  await ready(page);
   await load(page, "circle");
   assert(await page.locator("#combat-stats").isHidden());
-  assert.equal(await page.locator("#combat-values").innerText(), "");
   await page.locator("#open-duel").click();
-  await page.locator("#opponent-seed").fill("3");
-  await page.locator("#opponent-form").evaluate((f) => f.requestSubmit());
-  await page.locator("#duel-start").click();
-  assert.match(
-    await page.locator("#duel-status").innerText(),
-    /Current specimen wins/,
-  );
-  assert.equal(await page.locator("#duel-log li").count(), 0);
-  await page.locator("#opponent-seed").fill("circle");
-  await page.locator("#opponent-form").evaluate((f) => f.requestSubmit());
-  await page.locator("#duel-start").click();
-  assert.equal(await page.locator("#duel-status").innerText(), "Draw.");
-  await page.locator("#close-duel").click();
-  await load(page, (P_D + 1n).toString());
-  assert(await page.locator("#open-duel").isDisabled());
+  await page.waitForURL(/duel.html/);
+  await page.waitForFunction(() => !document.querySelector('#encounter').hidden);
+  assert.match(await page.locator('#round-status').innerText(), /Your creature wins/);
+  assert.equal(await page.locator('#fighter-0 progress').count(), 0);
   assert.deepEqual(errors, []);
   await context.close();
 });

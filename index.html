@@ -802,133 +802,13 @@ dialog::backdrop {
   }
 }
 
-/* Combat stays collapsed beside the observations; battles use one quiet dialog. */
-.combat-values {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0 20px;
-}
-.combat-values p {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 4px 0;
-}
-#combat-stats[hidden],
-#duel-controls[hidden] {
-  display: none;
-}
-#duel-dialog {
-  box-sizing: border-box;
-  width: min(620px, 94vw);
-  max-height: 88vh;
-  overflow: auto;
-}
-#duel-dialog input {
-  box-sizing: border-box;
-  min-width: 0;
-  max-width: 100%;
-}
-.opponent-row {
-  display: flex;
-  gap: 8px;
-  margin: 8px 0 16px;
-}
-.opponent-row input {
-  flex: 1;
-  width: 100%;
-}
-#duel-comparison table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 12px 0;
-  font-variant-numeric: tabular-nums;
-}
-#duel-comparison th,
-#duel-comparison td {
-  text-align: left;
-  padding: 6px;
-  border-bottom: 1px solid #333;
-  font-weight: 400;
-}
-#duel-comparison strong {
-  color: #eee;
-}
-#duel-actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin: 12px 0;
-}
-#duel-auto {
-  margin-bottom: 14px;
-}
-#battle-seed {
-  display: block;
-  margin: 6px 0 12px;
-  width: 100%;
-}
-#duel-health progress {
-  display: block;
-  width: 100%;
-  height: 7px;
-  margin-top: 5px;
-  accent-color: #bbb;
-}
-#duel-log {
-  padding-left: 20px;
-  max-height: 220px;
-  overflow: auto;
-  font-size: 12px;
-}
-#duel-log li {
-  margin: 5px 0;
-}
-#duel-help dd {
-  margin: 4px 0 12px;
-  font-size: 13px;
-}
-#combat-abilities p {
-  line-height: 1.5;
-}
-@media (max-width: 420px) {
-  .combat-values {
-    gap: 0 12px;
-    font-size: 12px;
-  }
-  #duel-dialog {
-    padding: 18px;
-  }
-}
+.combat-values { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+.combat-values p { display: flex; justify-content: space-between; gap: 8px; margin: 4px 0; }
+#combat-stats[hidden] { display: none; }
+#combat-abilities p { line-height: 1.5; }
+@media (max-width: 420px) { .combat-values { gap: 0 12px; font-size: 12px; } }
 
-#duel-actions button {
-  width: auto;
-  flex: 1 1 75px;
-}
-.opponent-row button {
-  width: auto;
-  flex: 0 0 auto;
-}
-#duel-start,
-#duel-auto {
-  width: auto;
-}
-#duel-dialog .dialog-heading {
-  position: sticky;
-  top: -24px;
-  z-index: 1;
-  background: var(--panel);
-  padding: 10px 0;
-}
-.combat-passives {
-  margin: 10px 0;
-  font-size: 12px;
-}
-@media (max-width: 420px) {
-  #duel-dialog .dialog-heading {
-    top: -18px;
-  }
-}
+
     </style>
   </head>
   <body>
@@ -937,7 +817,7 @@ dialog::backdrop {
       <nav class="toolbar" aria-label="Alien tools">
         <button id="open-search" type="button">Search &amp; filters</button>
         <button id="open-save" type="button" disabled>Save…</button>
-        <button id="open-duel" type="button" disabled>Duel…</button>
+        <button id="open-duel" type="button" disabled>Duel ↗</button>
         <label class="render-choice"
           >Render<select id="render-mode">
             <option value="skin">Skin</option>
@@ -1002,48 +882,6 @@ dialog::backdrop {
         </aside>
       </section>
     </main>
-    <dialog id="duel-dialog" aria-labelledby="duel-title">
-      <div class="dialog-heading">
-        <h2 id="duel-title">Duel</h2>
-        <button id="close-duel" type="button">Close</button>
-      </div>
-      <form id="opponent-form">
-        <label for="opponent-seed">Opponent seed</label>
-        <div class="opponent-row">
-          <input
-            id="opponent-seed"
-            type="text"
-            autocomplete="off"
-            required
-          /><button type="submit">Compare</button>
-        </div>
-      </form>
-      <div id="duel-comparison"></div>
-      <label class="small" for="battle-seed"
-        >Match seed · same matchup and actions replay the same outcome</label
-      >
-      <input id="battle-seed" type="text" value="0" maxlength="128" />
-      <button id="duel-start" type="button" disabled>Start duel</button>
-      <p id="duel-status" role="status" aria-live="polite"></p>
-      <div id="duel-health"></div>
-      <div id="duel-controls" hidden>
-        <div id="duel-actions"></div>
-        <button id="duel-auto" type="button">Auto resolve</button>
-      </div>
-      <details id="duel-help">
-        <summary>Rules &amp; actions</summary>
-        <p>
-          Two actions per round, faster specimen first. Damage uses stats and
-          passives; there are no types. Recovery has a cooldown. Unfinished
-          contests draw after 40 rounds. ↑ marks the stronger stat, not a
-          guaranteed winner.
-        </p>
-      </details>
-      <details>
-        <summary>Battle log</summary>
-        <ol id="duel-log"></ol>
-      </details>
-    </dialog>
     <dialog id="save-dialog" aria-labelledby="save-title">
       <div class="dialog-heading">
         <h2 id="save-title">Save</h2>
