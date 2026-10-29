@@ -59,12 +59,27 @@ Related searches accept `samePhenotype: false` to broaden structural modules. Or
 
 ## Combat
 
-`generate` and compact records include `combat: {ruleset, absolute, stats, budget, abilities}`. `schema().combat` lists the eight stats, actions and passives. `duel(leftSeed, rightSeed, {leftVersion: 2, rightVersion: 2, battleSeed: "0"})` regenerates both fighters and returns a deterministic auto-resolved battle.
+The current combat ruleset is **2**, independent of generator version. `generate` and compact records expose `combat: {ruleset, absolute, stats, budget, abilities}`. `schema().combat` lists ratings, actions, all 24 passives, five terrains, three times and the 60-round limit.
 
-- `/api/duel?left=42&right=3&battle=0` runs on the local Node server.
-- `api.html?op=duel&left=42&right=3` computes in the browser on static hosting.
-- Each side accepts either `left`/`right` or compact `leftPi`/`rightPi`; use `lv` and `rv` for generator versions. Duplicate or ambiguous identities are rejected.
-- `request({op: "duel", left: "42", right: "3", options: {battleSeed: "example"}})` also works through the iframe bridge.
-- `src/combat.js` exports `createBattle(recordA, recordB)`, immutable `stepBattle(state, leftAction, rightAction)`, `chooseAction(state, side)` and `finishBattle(state)` for interactive clients. Actions omitted from a step are selected by the AI from the preceding state.
+```js
+import { generate, duel, createBattle, stepBattle, availableActions } from './alien-api.js';
+const setup = { battleSeed: 'field-7', terrain: 'wetland', time: 'night' };
+const final = duel('42', '17', setup); // automated simulation
+let live = createBattle(generate('42'), generate('17'), setup);
+console.log(availableActions(live, 0)); // costs, descriptions, availability and reasons
+live = stepBattle(live, 'strike'); // opponent chooses from the preceding state
+```
 
-Battle output contains fighters, remaining health/energy, round, structured action log, `finished`, `winner` (0, 1, or null for a draw), and `reason`. Maximum duration is 40 rounds. `combat.ruleset` versions the game rules separately from generator identity. Stats are derived outputs, not new inverse-search filters.
+Options: `leftVersion` / `rightVersion` (for `duel`), `battleSeed` (non-empty string, maximum 64 characters, trimmed), `terrain` (`random`, `plain`, `wetland`, `dunes`, `forest`, `scree`), and `time` (`random`, `day`, `dusk`, `night`). Unknown conditions and duplicate URL parameters fail explicitly. There is no silent fallback for unaffordable moves.
+
+- Local HTTP: `/api/duel?left=42&right=17&battle=field-7&terrain=wetland&time=night`.
+- Static bridge: `api.html?op=duel&left=42&right=17&battle=field-7&terrain=wetland&time=night`.
+- Request object: `{op: 'duel', left: '42', right: '17', options: {battleSeed: 'field-7', terrain: 'wetland', time: 'night'}}`.
+- Each side accepts one of `left`/`leftPi` and `right`/`rightPi`; `lv` / `rv` preserve generator versions. Compact pi identifiers require the current generator.
+
+`createBattle`, `stepBattle`, `chooseAction`, `availableActions`, `actionAvailability` and `effectiveStats` are exported for interactive clients. Steps are immutable. Illegal explicit choices throw without changing the input. Omitting an action asks the AI to choose; induced sleep may supersede a committed move and is logged as Sleep. The low-level state is caller-owned, not a secure multiplayer protocol.
+
+Battle output includes resolved `environment`, fighters, statuses, cooldowns, health/energy, round and a structured log. Events include per-event snapshots for animation; `upkeep` records residual damage, healing and energy restoration. `finished`, `winner` (0 / 1 / null) and `reason` describe the result. Calls using an old combat state are rejected rather than silently reinterpreted.
+
+The **playable page** is `duel.html`, not `/api/duel`. Its share links use `r=2`, creature identifiers, `battle`, `terrain`, `time` and optionally `moves`. Move pairs are hexadecimal indices into the exported ACTIONS insertion order, at most 60 pairs. File URLs use a fragment; hosted URLs use query parameters. `src/duel-links.js` builds and parses these links; the page validates the entire transcript before playing it. Incompatible rulesets and illegal transcripts are rejected. Same setup plus the same move sequence is reproducible; an encounter code alone does not predetermine a winner.
+

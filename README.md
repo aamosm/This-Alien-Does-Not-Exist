@@ -1,68 +1,97 @@
 <h1 align="center">This Alien Doesn't Exist</h1>
+
 <p align="center">A procedural alien generator with deterministic seeds and trait-based search.</p>
+
 <p align="center"><a href="https://thisaliendoesnotexist.app">Website</a> · <a href="https://github.com/aamosm/This-Alien-Does-Not-Exist">Source</a></p>
 
 ![The generator interface and observation panel](docs/images/site.png)
 
-Generate an alien from a seed, revisit it later, or search for traits. Everything runs in the browser; no account or external model is needed.
+Generate aliens from seeds, then use those seeds to revisit them later. You can also search for specific traits instead of relying on random discovery. Generation and search run in the browser, so neither an account nor an external image model is needed.
 
 ## Run
 
-Open `index.html` for offline use. For the local server, JSON endpoints and CLI, install Node.js 22 or later and run:
+Open `index.html` for offline use. To run the local server, including its JSON endpoints and CLI, install Node.js 22 or later and run:
 
 ```bash
 npm start
 ```
 
-**Quick** is the lightweight renderer; **Skin** adds surface detail and lighting. Random discovery avoids the last ten silhouette clusters even when markings differ. Wing membranes vary in sweep, chord and tip shape instead of sharing a fixed quadrilateral. Body, head and limb construction now also use the position within their genome choice intervals. This changes current-generator appearances at existing seeds; the original generator is unchanged.
+**Quick** uses the lightweight renderer, while **Skin** adds surface detail and lighting.
+
+Random discovery avoids the last ten silhouette clusters, so changing an alien's markings doesn't make an existing outline count as a new discovery. The generator also varies wing membranes by their sweep, chord and tip shape. Body, head and limb construction vary with the position within each genome choice interval, giving aliens in the same body family more anatomical variation.
+
+These changes affect the current generator's appearances at existing seeds, but the original generator remains unchanged.
 
 ## Search
 
-Use **Search & filters** to combine traits, for example:
+Use **Search & filters** to combine traits. For example, you could look for aliens with exactly four eyes, a spotted skin pattern and a colour close to `120`:
 
 1. Eyes → Exactly → `4`
 2. Skin pattern → Is → `Spots`
 3. Colour → About → `120`
 
-Select **Find matches**. Results show which traits matched. Some combinations of geometric constraints can only return an approximate match.
+Select **Find matches** to see the results and which traits each one matched. Some geometric constraints conflict with one another, so a result may be an approximate match rather than satisfy every constraint exactly.
 
 ![Trait search with examples and results](docs/images/search.png)
 
-**Start from the alien on screen** finds visibly different relatives. **Keep the same body type** preserves the anatomy family; uncheck it to explore different body and head modules. The solver varies several proportions and compares outlines, so changing only paint or texture does not fill the results with copies. Restrictive filters can return fewer results. Search links can be shared; the JSON editor accepts the API query format.
+**Start from the alien on screen** searches for visibly different relatives. Enable **Keep the same body type** to stay within the current anatomy family; turn it off to explore different body and head modules.
 
-Search builds genomes from the requested traits rather than scanning random seeds. See [REVERSE.md](docs/REVERSE.md) for the method and its limits.
+The solver varies proportions and compares outlines, which helps distinguish aliens with similar anatomy instead of returning near-identical copies that only differ in paint or texture. Restrictive filters can still leave you with fewer results.
+
+Search links can be shared, and the JSON editor accepts the same query format as the API.
+
+Search builds genomes from the requested traits rather than scanning random seeds. See [REVERSE.md](docs/REVERSE.md) for how the method works and where it has limitations.
 
 ## Combat
 
-Expand **Combat** beside the observations to inspect eight simulation ratings and two passive abilities. Choose **Duel…**, enter another seed, and compare; ↑ marks the higher stat. Start a duel, choose actions yourself, or use **Auto resolve**. Everything runs locally and keeps the same minimal canvas layout.
+Choose **Duel ↗** to open the dedicated [arena](duel.html). Keeping combat on its own page leaves the generator's interface largely untouched; the arena has room for both creatures, animated attacks, health and energy bars, move explanations and a round log. The built `duel.html` also works offline.
 
-Ordinary creatures share 800 total rating points. Size, proportions, limbs, sensory layout and environmental inputs create trade-offs between vitality, power, defense, dexterity, speed, intellect, resolve and recovery. These are game rules, not biological facts. There are no elemental types. A match seed makes the same matchup and action sequence reproducible. [Combat rules](docs/COMBAT.md) explain all formulas, abilities and exceptions.
+1. Enter the two creature seeds and choose the terrain and time of day. You can leave the encounter choices to the game instead.
+2. Select **Preview encounter** to apply those settings. Expand the comparison to inspect effective ratings, activity preferences, habitat advantages and both creatures' passive abilities.
+3. Select **Start duel** and choose a move to read its explanation. Press **Use … · play one round** to commit the action. Both creatures choose their actions before either attacks, and the faster creature acts first. Guard protects its user for the entire round.
+4. **Breathe** restores energy without healing. **Rest** heals but puts the creature to sleep for two turns, during which the Sleep button advances the fight. Move cards explain their energy costs, cooldowns and availability.
+5. **Autoplay** plays through the visible rounds and can be paused. **Copy replay link** preserves the encounter setup and the moves already played, letting someone else watch the same rounds before continuing.
 
-The API exposes `duel('42', '3')` and `/api/duel?left=42&right=3&battle=0`. JSON records include `combat`; imported records are regenerated from their identity so supplied stats cannot override the rules.
+The creature seed determines the creature; the encounter code determines chance rolls and any arena choices left to the game. The code is not a strength level, and changing it doesn't change either creature.
+
+With the same creatures, encounter code, terrain, time, combat rules and actions, the duel produces the same outcome. Different actions can produce a different result, while a new encounter code changes the rolls without requiring different creatures.
+
+There are **13 selectable moves and 24 passive abilities**. Each finite creature receives two deterministically selected passives, and all 24 have implemented effects. The mechanics take inspiration from familiar turn-based RPGs without using elemental types or attempting to reproduce another game's entire ability catalogue.
+
+Ordinary creatures have a shared budget of 800 stat points, so their ratings involve trade-offs rather than every stat being maximised. Activity preferences for day, night and dusk, along with moisture preference, cover and support proportions, provide modest environmental advantages. These affect combat performance; being active at the wrong time does not automatically put a creature to sleep. Creatures start awake.
+
+Battles end after 60 rounds. Healing is halved after round 30 and disabled after round 45 to limit recovery loops. Human progression and the final circle have their own rules. [COMBAT.md](docs/COMBAT.md) documents the formulas, moves, abilities and exceptions.
+
+The API supports calls such as `duel('42', '17', {battleSeed: 'field-7', terrain: 'wetland', time: 'night'})`. Interactive clients can also import `createBattle`, `stepBattle` and `availableActions` from `alien-api.js`.
+
+Imported creature records have their ratings regenerated from their identity, rather than being allowed to supply their own combat stats. These battles are local simulations, not an authenticated competitive service.
 
 ## Seeds and saves
 
+A creature's identity is `generatorVersion + seed`. The generator version matters because the same seed can produce different creatures under different versions: `?v=2&seed=42` opens the current generator, while `?v=1&seed=42` opens the original mapping.
 
-A creature's identity is `generatorVersion + seed`. `?v=2&seed=42` opens the current generator; `?v=1&seed=42` opens the original mapping.
-
-The **Save…** menu exports PNG or JSON for the current creature, or JSONL for saved discoveries. Imports support JSON and JSONL. Browser storage is optional; export discoveries before clearing browser data.
+The **Save…** menu exports the current creature as PNG or JSON, or saved discoveries as JSONL. Imports support both JSON and JSONL. Browser storage is optional, so export your discoveries before clearing browser data if you need to keep them.
 
 ## JavaScript API
 
-`alien-api.js` is a dependency-free ES module:
+`alien-api.js` is a dependency-free ES module. For example, you can generate an alien, search for creatures matching a trait and find anatomical relatives:
 
 ```js
 import { generate, search, closest } from './alien-api.js';
 
 const alien = generate('42', { generatorVersion: 2 });
+
 const matches = await search({
   constraints: [{ field: 'eyeCount', op: 'eq', value: 4 }],
   limit: 6
 });
-const relatives = await closest(alien.identity.seed, { category: 'anatomy' });
+
+const relatives = await closest(alien.identity.seed, {
+  category: 'anatomy'
+});
 ```
 
-See [API.md](docs/API.md) for query fields, responses and server routes. GitHub Pages supports the module and browser-based `api.html` bridge, but cannot run the Node HTTP endpoints.
+See [API.md](docs/API.md) for the available query fields, response formats and server routes. GitHub Pages supports the module and the browser-based `api.html` bridge, but it cannot run the Node HTTP endpoints.
 
 ## Develop
 
@@ -75,7 +104,9 @@ npm run test:browser
 npm run audit
 ```
 
-`npm run package` creates `dist/This-Alien-Does-Not-Exist.zip`. Publish `index.html`, `404.html`, `.nojekyll`, `alien-api.js`, `api.html` and `LICENSE` for GitHub Pages. Keep `CNAME` only for the custom domain.
+`npm run package` creates `dist/This-Alien-Does-Not-Exist.zip`.
+
+For GitHub Pages, publish `index.html`, `404.html`, `.nojekyll`, `alien-api.js`, `api.html` and `LICENSE`. Keep `CNAME` only when using the custom domain.
 
 ## License
 

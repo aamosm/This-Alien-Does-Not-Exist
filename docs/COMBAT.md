@@ -1,84 +1,123 @@
-# Combat rules
+# Combat rules and player reference
 
-Combat is a local, deterministic game simulation. Ratings do not assert biological facts. There are no elemental types, type multipliers, levels to grind, purchases or server accounts. The default page stays a generator; Combat is collapsed, and Duel opens one dialog.
+This is a local fictional ecological game model. It has no elemental types. Open duel.html from the generator's Duel button or directly. Choose two specimens, preview conditions, then select a move and play one round. The computer chooses independently, before seeing your chosen move. Autoplay is paced and pausable.
 
-## Ratings and trade-offs
+## Two different kinds of seed
 
-Ordinary specimens receive exactly **800 points across eight ratings**. Each rating starts at 40; the remaining 480 points are divided by positive anatomical weights and allocated with largest-remainder rounding. All outputs are finite. Broad/heavy bodies favor vitality, power and defense; reach and smaller mass favor speed; limbs and eyes favor dexterity; head proportions and exploration favor intellect. Caution, gravity, resources and moisture shift resolve and recovery. Improving one share reduces others. The precise bounded input normalizations and weights are in `combatProfile()` in `src/combat.js`.
+Creature seeds determine anatomy and base ratings. The encounter code controls chance and optional automatic terrain/time selection. It does not increase a creature's strength. Codes are trimmed non-empty text of at most 64 characters. Same fighters, code, resolved environment, ruleset and moves reproduce the same result. Different moves can produce a different winner. Replay links save both choices for every played round.
 
-| Rating | Gameplay effect |
-|---|---|
-| Vitality | Maximum health = round(180 + 2 × vitality). |
-| Power | Strike damage. |
-| Defense | Reduces strike and feint damage. |
-| Dexterity | Accuracy, critical chance and feint damage. |
-| Speed | First action each round and evasion. |
-| Intellect | Feint damage, Focus strength and AI decision quality. |
-| Resolve | Reduces the opponent's critical chance. |
-| Recovery | Increases Recover healing. |
+## Ratings
 
-Two distinct passives are sampled deterministically from the seed, weighted by the square of their associated rating. This gives affinity without assigning every high-intellect specimen the same abilities. Each passive is a renamed, type-free adaptation of a familiar RPG battle mechanic; the descriptions here are the actual implemented rules.
+Ordinary creatures share 800 points: 40 per rating plus 480 distributed by positive anatomical weights with largest-remainder rounding. Body mass, reach, support thickness, limb/eye counts, head proportions, exploration, caution, resources and moisture create trade-offs. Exact weights are in combat-profile.js. Maximum health is round((300 + 2 × vitality) × Deep Reserve multiplier); ordinary maximum energy is 100, or 125 with Deep Reserve. These are simulation rules, not biological measurements.
 
-| Passive | Rating affinity | Effect |
-|---|---|---|
-| Deep Reserve | Vitality | Maximum health +8%; starts with 125 energy instead of 100. |
-| Last Ember | Power | 20% more damage below 30% health. |
-| First Shell | Defense | 28% less damage while at full health. |
-| True Bearing | Dexterity | +6 percentage points of accuracy, capped at 97%. |
-| Rising Tempo | Speed | +6% initiative per completed turn, capped at +30%. |
-| Quiet Calculation | Intellect | Feint damage +12%. |
-| Unbroken Thread | Resolve | Once survives a lethal hit with 1 health, if above 20% health immediately before that hit. |
-| Returning Pulse | Recovery | Heals 4% of maximum health at the start of turns 3, 6 and 9. |
+| Rating | Effect |
+| --- | --- |
+| Vitality | Sets maximum health. |
+| Power | Strength of contact attacks. |
+| Defense | Reduces incoming damage. |
+| Dexterity | Improves accuracy and critical chance. |
+| Speed | Decides who attacks first. |
+| Intellect | Strengthens feints, pulses and tactical choices. |
+| Resolve | Resists critical hits and sleep. |
+| Recovery | Improves healing while resting. |
 
 ## Actions
 
-| Action | Energy cost | Effect |
-|---|---|---|
-| Strike | 8 | Efficient power-based damage. |
-| Feint | 18 | Dexterity/intellect damage, lower armor penalty, partly ignores Guard. |
-| Guard | 0 | Restores 18 energy; reduces strikes by 55% and feints by 18% until the fighter's next action. |
-| Recover | 0 | Restores 26 energy; healing is round(8% max health + 0.12 × recovery), with a three-own-turn cooldown. |
-| Focus | 8 | Next two attacks multiply damage by min(2.2, 1.65 + intellect/1000). Misses consume a charge. |
+All finite creatures can use these functional moves; names describe the simulated effect, not proof of an anatomical gland or psychic organ. Sleep is automatic only while asleep; the other 13 are selectable.
 
-Every action starts by restoring 6 energy. An unaffordable action becomes Recover. Healing and energy never exceed their caps. A fighter defeated by the first action does not act afterward. The AI chooses from the previous state, before seeing the human's current choice. Higher intellect increases the probability of choosing its situational policy; it is not an unbeatable oracle.
+| Move | Energy | Effect |
+| --- | --- | --- |
+| Strike | 12 | Reliable contact attack. Power against defense. |
+| Feint | 18 | A tactical hit using dexterity and intellect. Bypasses most of Guard. |
+| Lunge | 24 | Heavy contact attack. Stronger, but less accurate. |
+| Sweep | 20 | Lower damage. Slows the target by 20% for the next two rounds. |
+| Irritant spray | 22 | Low impact, then 2.5% maximum health damage for three rounds. Does not stack. |
+| Neural pulse | 22 | Intellect-based pressure that partially bypasses defense. |
+| Siphon | 20 | Light contact attack; heals 40% of damage actually dealt. |
+| Lulling signal | 26 | No damage. Base 65% chance to induce two sleeping turns; intellect, accuracy and resolve modify it. Five-round cooldown. |
+| Guard | 0 | Protects for this whole round, even if slower. Blocks 55% damage, but only 15% of a Feint. +14 energy. |
+| Breathe | 0 | Restores 34 energy. Does not heal health. |
+| Focus | 10 | Next two damaging attacks gain 35% damage and 3 points of accuracy. Cannot stack. |
+| Rest | 0 | Heals 15% health plus recovery bonus, clears irritation, then sleeps for two turns. Six-round cooldown. |
+| Purge | 14 | Clears irritation and slowing, and heals 4% maximum health. |
+| Sleep | 0 | Forced while asleep: heals 3% health and restores 12 energy. One sleeping turn passes. |
 
-Before focus, passives, guard and critical modifiers:
+Every surviving creature regains five energy at round end. Invalid actions fail; they are never silently replaced. The only committed action that can be superseded is one interrupted by induced sleep. Rest sets two sleeping turns; each subsequent Sleep action consumes one. Lulling a slower opponent may consume its first sleeping turn in the current round. Sleep does not grant invulnerability. Purge has a four-round cooldown. Cooldowns count complete rounds after use. Card explanations show when moves become available.
+
+Guard is declared at the start of the round, so it works even against a faster attacker. A defeated fighter cannot take its later action. Status upkeep is resolved for both sides before determining a possible simultaneous draw. Focus has two charges, consumed by damaging attacks including misses; it does not stack. Irritation does not stack; reapplication refreshes three round-end ticks. Slowing lasts two future rounds.
+
+## Environment, activity and sleep
+
+Time is Daylight, Dusk/dawn or Night and remains fixed during a battle. Diurnal creatures prefer daylight, nocturnal ones night, and crepuscular ones dusk/dawn. Matching gives +6% speed and +3% dexterity; otherwise these are −6% and −3%. A creature always begins awake: rest preference and actual Sleep status are separate. The comparison shows its usual rest window and the active modifiers.
+
+| Terrain | Effect |
+| --- | --- |
+| Open plain | Neutral ground. No habitat advantage. |
+| Wetland | Moisture-adapted creatures gain up to 8% speed and recovery; dry-adapted ones lose up to 8%. |
+| Dunes | Dry-adapted creatures gain up to 8% speed and recovery; moisture-adapted ones lose up to 8%. |
+| Dense growth | High-cover creatures gain up to 8% dexterity. Low-cover creatures lose up to 8%. |
+| Scree | Short, thick supports gain up to 8% defense. Longer, thin supports lose up to 8%. |
+
+Moisture and cover preferences come from the generated environment. Support fit uses limb thickness relative to reach. These are bounded game adaptations. Abilities may add further advantages. Wetland/Dunes alter effective recovery as well as speed; Rest uses effective recovery. The entire setup is part of battle identity.
+
+## Passive abilities
+
+Each finite creature gets two distinct passives. Stat affinities weight their seed-determined selection; moisture and activity also bias habitat-related passives. No passive is a label without an implemented effect. All 24 are reachable in the ordinary pool. The special human sequence retains its deliberate ability progression.
+
+| Passive | Affinity | Effect |
+| --- | --- | --- |
+| First Shell | Defense | 28% less damage at full health. |
+| Last Ember | Power | 20% more damage below 30% health. |
+| True Bearing | Dexterity | +6 percentage points to accuracy (maximum 97%). |
+| Rising Tempo | Speed | +3% speed each completed round, up to 24%. |
+| Quiet Calculation | Intellect | Feint and Neural pulse deal 12% more damage. |
+| Unbroken Thread | Resolve | Once, survives a lethal direct hit at 1 health if above 20% before it. |
+| Returning Pulse | Recovery | Heals 3% maximum health every third round, through round 18. |
+| Deep Reserve | Vitality | +8% maximum health and 125 maximum energy instead of 100. |
+| Clean Blood | Recovery | Immune to irritation from Irritant spray. |
+| Open Watch | Resolve | Cannot be put to sleep. Rest is unavailable; Breathe still restores energy. |
+| Renewing Coat | Recovery | Clears irritation and slowing at the end of every third round. |
+| Contact Spines | Defense | Returns 8% of contact damage to the attacker. Cannot reflect itself. |
+| Nutrient Return | Vitality | Heals 12% of direct damage dealt. |
+| Layered Cortex | Defense | Incoming hits cannot become critical hits. |
+| Deep Torpor | Recovery | Rest and sleeping heal 35% more. |
+| Moisture Draw | Recovery | Heals 1.5% maximum health each round in Wetland. |
+| Light Harvest | Vitality | +4 energy each round in Daylight. |
+| Sand Stride | Speed | +12% speed in Dunes. |
+| Marsh Glide | Speed | +12% speed in Wetland. |
+| Stone Brace | Defense | +12% defense on Scree. |
+| Dark Adaptation | Dexterity | +5 percentage points to accuracy at Night. |
+| Folded Rampart | Defense | Guard blocks 65% of ordinary damage instead of 55%. |
+| Seam Finder | Intellect | Attacks against Guard deal 20% more damage after its reduction. |
+| Stress Sense | Power | 12% more damage against irritated or slowed targets. |
+
+## Damage and pacing
+
+Before passives, focus, guard and critical modifiers:
 
 ```text
-Strike = (20 + 0.42 × power) × 100 / (75 + 0.65 × enemy defense)
-Feint  = (16 + 0.18 × dexterity + 0.28 × intellect) × 100 / (95 + 0.4 × enemy defense)
-Accuracy = clamp(base + (dexterity − enemy speed)/900 + focus bonus + passive bonus, 0.65, 0.97)
-base = 0.86 for Strike; 0.91 for Feint
-focus accuracy bonus = 0.03
-Critical chance = 0.04 + 0.12 × dexterity / (dexterity + enemy resolve)
-Critical damage = 1.35 × damage
+Contact rating = power
+Mental rating = 0.6 × intellect + 0.4 × dexterity
+Damage = (46 + 0.38 × rating) × move.power × 100 / (85 + armor × target defense)
+armor = 0.32 for mental moves, otherwise 0.60
+Accuracy = clamp(move.accuracy + (dexterity − target speed)/1600 + focus bonus + passives, 0.55, 0.97)
+Lulling signal base = clamp(0.65 + (intellect − target resolve)/1800, 0.30, 0.75)
+Lulling signal then uses the same final accuracy clamp and passive accuracy bonuses.
+Focus bonus = 0.03 accuracy and ×1.35 damage, for damaging moves only
+Critical chance = 0.03 + 0.10 × dexterity / (dexterity + target resolve)
+Critical multiplier = 1.25
 ```
 
-Final damage is rounded to at least 1 on a hit. Speed orders actions; deterministic, identity-based tie breaking avoids a left-seat advantage. Match seed, identities, round and event name determine rolls. Identical identities draw immediately. Unfinished finite battles draw after 40 rounds; health percentages are not used to fabricate a winner.
+Speed controls attack order; deterministic identity-based tie breaking avoids a fixed left-seat advantage. Damage is rounded and capped at remaining health. Passive healing uses damage actually dealt, not overkill. Reflection does not recurse. Recovery halves after round 30 and stops after round 45 to prevent indefinite healing loops. Sixty rounds without a knockout is a draw. Ordinary pacing is measured by combat-audit.mjs; human decisions can differ from that sample.
 
-## Special sequence (internal rules)
+## Special progression
 
-The observations remain specimen descriptions; the interface does not explain the hidden sequence. For its existing progress value `t`, ratings are:
+The existing human progression formulas remain unchanged: intellect strictly rises at every finite prefix, physical power falls, dexterity first rises then falls, while defense/resolve/recovery rise. Later stages intentionally exceed ordinary parity. The final circle has null stats, null health and energy, and no passives. It immediately defeats finite creatures; two circles draw. Identical finite identities also draw immediately. Hidden-sequence explanations stay out of the player UI.
 
-```js
-({
-  vitality: 110 + 50*t,
-  power: 90*(1 - 0.65*t),
-  defense: 90 + 100*t,
-  dexterity: 110 + 140*t - 190*t*t,
-  speed: 100 + 80*t - 65*t*t,
-  intellect: 110 + 290*t,
-  resolve: 100 + 200*t,
-  recovery: 90 + 70*t
-})
-```
+## Motion and rendering
 
-Values retain three decimals. Intellect strictly increases over every finite prefix. Dexterity first rises and then falls; physical power declines; defense, resolve and recovery rise. The initial human has 800 points. Later stages intentionally leave ordinary budget parity, favoring tactical feints and focus over physical strikes. Passives progress from True Bearing/Returning Pulse, to True Bearing/Quiet Calculation, to Quiet Calculation/Unbroken Thread.
+The arena caches a Quick-render texture and deforms it through a continuous triangular mesh using existing limb/neck anchors. Shared vertices have a single destination, so body surfaces, attachments, eyes and markings travel together. Small bounded bends, a short lunge, hop and recoil provide motion. This is a gentle two-dimensional animation, not physics or a new skeletal simulator. The human's motion fades as its outline loses limbs. The final circle stays still. Legacy records lack the new rig, so they retain their renderer and use whole-body motion only. Reduced-motion preference disables action animation, without changing results. There are no perpetual idle animations.
 
-At the final circle: `absolute: true`, `stats: null`, `budget: null`, `abilities: []`. The Combat drawer is absent. A duel against anything finite is an immediate win without rolls or a fake health bar; two absolute circles draw. The invariant takes precedence over all finite passives.
+## Verification and APIs
 
-## APIs, integrity and balance
-
-Records expose `combat.ruleset = 1`. `duel()` regenerates fighters from seed/version; imports likewise regenerate stats rather than trusting supplied numbers. Low-level combat functions accept generated records or their compact catalogue form, return JSON-serializable states, and do not mutate records or previous turns.
-
-Run `npm test` for budgets, every finite sequence step, deterministic seat symmetry, limits and endpoint handling. `node scripts/combat-audit.mjs` records 960 auto-play matches across 120 ordinary specimens. The report includes passive appearance/win counts and the human curve. These are finite samples, with stat/passive correlations; they are not a claim of competitive perfection or proof that one ability alone caused a win. Human choices and match seeds can change the result.
+Run npm test, npm run test:browser and node scripts/combat-audit.mjs. Tests cover guard timing, sleep, cooldowns, every passive's observable effect, replay identity, animation mesh continuity, pacing and old seed compatibility. The 960-match report is a finite automated sample, not a claim of perfect competitive balance. Combat ruleset 2 versions these mechanics independently of generator identity. See API.md for interactive functions and static-host limitations.

@@ -1,53 +1,140 @@
 {
-  "ruleset": 1,
+  "ruleset": 2,
   "specimens": 120,
   "battles": 960,
   "ordinaryBudget": 800,
   "draws": 0,
-  "meanRounds": 10.565625,
+  "meanRounds": 28.214583333333334,
+  "duration": {
+    "min": 8,
+    "median": 28,
+    "max": 53,
+    "atMostTwo": 0
+  },
+  "conditions": {
+    "plain/day": 64,
+    "wetland/day": 64,
+    "dunes/day": 64,
+    "forest/day": 64,
+    "scree/day": 64,
+    "plain/dusk": 64,
+    "wetland/dusk": 64,
+    "dunes/dusk": 64,
+    "forest/dusk": 64,
+    "scree/dusk": 64,
+    "plain/night": 64,
+    "wetland/night": 64,
+    "dunes/night": 64,
+    "forest/night": 64,
+    "scree/night": 64
+  },
   "byAbility": {
-    "vigor": {
-      "appearances": 480,
-      "wins": 243
+    "surge": {
+      "appearances": 112,
+      "wins": 62
     },
-    "renewal": {
-      "appearances": 608,
-      "wins": 316
+    "opportunist": {
+      "appearances": 144,
+      "wins": 80
     },
-    "tenacity": {
-      "appearances": 368,
-      "wins": 140
-    },
-    "bulwark": {
-      "appearances": 528,
-      "wins": 249
-    },
-    "quickening": {
-      "appearances": 464,
-      "wins": 223
+    "anchored": {
+      "appearances": 208,
+      "wins": 93
     },
     "insight": {
-      "appearances": 608,
-      "wins": 330
+      "appearances": 240,
+      "wins": 131
     },
-    "surge": {
-      "appearances": 448,
-      "wins": 262
+    "bulwark": {
+      "appearances": 160,
+      "wins": 63
+    },
+    "shellguard": {
+      "appearances": 96,
+      "wins": 42
+    },
+    "torpor": {
+      "appearances": 112,
+      "wins": 75
+    },
+    "breaker": {
+      "appearances": 224,
+      "wins": 94
+    },
+    "bastion": {
+      "appearances": 192,
+      "wins": 87
+    },
+    "dunewalker": {
+      "appearances": 272,
+      "wins": 102
+    },
+    "antivenom": {
+      "appearances": 144,
+      "wins": 59
     },
     "surefoot": {
-      "appearances": 336,
-      "wins": 157
+      "appearances": 160,
+      "wins": 83
+    },
+    "nightvision": {
+      "appearances": 144,
+      "wins": 70
+    },
+    "siphon": {
+      "appearances": 192,
+      "wins": 137
+    },
+    "sunfeed": {
+      "appearances": 160,
+      "wins": 86
+    },
+    "renewal": {
+      "appearances": 208,
+      "wins": 119
+    },
+    "shedskin": {
+      "appearances": 112,
+      "wins": 64
+    },
+    "barbs": {
+      "appearances": 192,
+      "wins": 109
+    },
+    "tenacity": {
+      "appearances": 160,
+      "wins": 66
+    },
+    "dew": {
+      "appearances": 144,
+      "wins": 90
+    },
+    "wakeful": {
+      "appearances": 80,
+      "wins": 21
+    },
+    "quickening": {
+      "appearances": 112,
+      "wins": 34
+    },
+    "marshrunner": {
+      "appearances": 96,
+      "wins": 38
+    },
+    "vigor": {
+      "appearances": 176,
+      "wins": 115
     }
   },
   "perSpecimenWinRange": [
-    0.125,
-    0.9375
+    0,
+    1
   ],
   "piExamples": [
     {
       "m": 1,
       "profile": {
-        "ruleset": 1,
+        "ruleset": 2,
         "absolute": false,
         "budget": 800,
         "stats": {
@@ -69,7 +156,7 @@
     {
       "m": 2,
       "profile": {
-        "ruleset": 1,
+        "ruleset": 2,
         "absolute": false,
         "budget": 867.31,
         "stats": {
@@ -91,7 +178,7 @@
     {
       "m": 14,
       "profile": {
-        "ruleset": 1,
+        "ruleset": 2,
         "absolute": false,
         "budget": 1194.593,
         "stats": {
@@ -113,7 +200,7 @@
     {
       "m": 100,
       "profile": {
-        "ruleset": 1,
+        "ruleset": 2,
         "absolute": false,
         "budget": 1325.896,
         "stats": {
@@ -135,7 +222,7 @@
     {
       "m": 500,
       "profile": {
-        "ruleset": 1,
+        "ruleset": 2,
         "absolute": false,
         "budget": 1395.355,
         "stats": {
@@ -157,7 +244,7 @@
     {
       "m": 999,
       "profile": {
-        "ruleset": 1,
+        "ruleset": 2,
         "absolute": false,
         "budget": 1416.478,
         "stats": {
@@ -179,7 +266,7 @@
     {
       "m": 1000,
       "profile": {
-        "ruleset": 1,
+        "ruleset": 2,
         "absolute": true,
         "stats": null,
         "budget": null,

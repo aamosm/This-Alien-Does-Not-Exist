@@ -1,8 +1,14 @@
 import { generate } from "../src/engine.js";
-import { simulateBattle } from "../src/combat.js";
+import {
+  simulateBattle,
+  COMBAT_RULESET,
+  TERRAINS,
+  TIMES,
+} from "../src/combat.js";
 import { mix64 } from "../src/random.js";
 import { writeFile } from "node:fs/promises";
 import { piSeed } from "../src/pi.js";
+import { schema } from "../src/api.js";
 
 const records = Array.from({ length: 120 }, (_, i) =>
   generate(mix64(BigInt(i) + 50000n).toString()),
@@ -12,6 +18,9 @@ const byAbility = {},
   wins = records.map(() => 0),
   matches = records.map(() => 0);
 
+const durations = [],
+  conditions = {};
+
 let draws = 0,
   rounds = 0;
 
@@ -19,8 +28,15 @@ for (let i = 0; i < records.length; i++)
   for (let j = 1; j <= 8; j++) {
     const k = (i + j * 13) % records.length,
       b = simulateBattle(records[i], records[k], {
-        battleSeed: String(j),
+        battleSeed: `${i}-${j}`,
+        terrain: Object.keys(TERRAINS)[(i * 8 + j - 1) % 5],
+        time: Object.keys(TIMES)[Math.floor((i * 8 + j - 1) / 5) % 3],
       });
+
+    durations.push(b.round);
+
+    const setting = b.environment.terrain + "/" + b.environment.time;
+    conditions[setting] = (conditions[setting] ?? 0) + 1;
 
     rounds += b.round;
     draws += Number(b.winner === null);
@@ -41,12 +57,19 @@ for (let i = 0; i < records.length; i++)
   }
 
 const report = {
-  ruleset: 1,
+  ruleset: COMBAT_RULESET,
   specimens: 120,
   battles: 960,
   ordinaryBudget: 800,
   draws,
   meanRounds: rounds / 960,
+  duration: {
+    min: Math.min(...durations),
+    median: [...durations].sort((a, b) => a - b)[480],
+    max: Math.max(...durations),
+    atMostTwo: durations.filter((n) => n <= 2).length,
+  },
+  conditions,
   byAbility,
   perSpecimenWinRange: [
     Math.min(...wins.map((w, i) => w / matches[i])),
@@ -66,3 +89,8 @@ await writeFile(
 );
 
 console.log(JSON.stringify({ ...report, piExamples: undefined }, null, 2));
+
+await writeFile(
+  new URL("../docs/schema.json", import.meta.url),
+  JSON.stringify(schema(), null, 2) + "\n",
+);

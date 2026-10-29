@@ -1153,7 +1153,7 @@
     }
   },
   "combat": {
-    "ruleset": 1,
+    "ruleset": 2,
     "stats": {
       "vitality": "Vitality",
       "power": "Power",
@@ -1168,65 +1168,270 @@
     "abilities": {
       "bulwark": {
         "name": "First Shell",
-        "description": "Takes 28% less damage while at full health."
+        "description": "28% less damage at full health.",
+        "affinity": "defense"
       },
       "surge": {
         "name": "Last Ember",
-        "description": "Deals 20% more damage below 30% health."
+        "description": "20% more damage below 30% health.",
+        "affinity": "power"
       },
       "surefoot": {
         "name": "True Bearing",
-        "description": "Adds 6 percentage points to hit chance, up to 97%."
+        "description": "+6 percentage points to accuracy (maximum 97%).",
+        "affinity": "dexterity"
       },
       "quickening": {
         "name": "Rising Tempo",
-        "description": "Gains 6% initiative per completed turn, up to 30%."
+        "description": "+3% speed each completed round, up to 24%.",
+        "affinity": "speed"
       },
       "insight": {
         "name": "Quiet Calculation",
-        "description": "Feints deal 12% more damage."
+        "description": "Feint and Neural pulse deal 12% more damage.",
+        "affinity": "intellect"
       },
       "tenacity": {
         "name": "Unbroken Thread",
-        "description": "Once, survives a lethal hit at 1 health if above 20% before the hit."
+        "description": "Once, survives a lethal direct hit at 1 health if above 20% before it.",
+        "affinity": "resolve"
       },
       "renewal": {
         "name": "Returning Pulse",
-        "description": "Restores 4% health on its third, sixth and ninth turns."
+        "description": "Heals 3% maximum health every third round, through round 18.",
+        "affinity": "recovery"
       },
       "vigor": {
         "name": "Deep Reserve",
-        "description": "Maximum health +8%; starts with 125 energy instead of 100."
+        "description": "+8% maximum health and 125 maximum energy instead of 100.",
+        "affinity": "vitality"
+      },
+      "antivenom": {
+        "name": "Clean Blood",
+        "description": "Immune to irritation from Irritant spray.",
+        "affinity": "recovery"
+      },
+      "wakeful": {
+        "name": "Open Watch",
+        "description": "Cannot be put to sleep. Rest is unavailable; Breathe still restores energy.",
+        "affinity": "resolve"
+      },
+      "shedskin": {
+        "name": "Renewing Coat",
+        "description": "Clears irritation and slowing at the end of every third round.",
+        "affinity": "recovery"
+      },
+      "barbs": {
+        "name": "Contact Spines",
+        "description": "Returns 8% of contact damage to the attacker. Cannot reflect itself.",
+        "affinity": "defense"
+      },
+      "siphon": {
+        "name": "Nutrient Return",
+        "description": "Heals 12% of direct damage dealt.",
+        "affinity": "vitality"
+      },
+      "shellguard": {
+        "name": "Layered Cortex",
+        "description": "Incoming hits cannot become critical hits.",
+        "affinity": "defense"
+      },
+      "torpor": {
+        "name": "Deep Torpor",
+        "description": "Rest and sleeping heal 35% more.",
+        "affinity": "recovery"
+      },
+      "dew": {
+        "name": "Moisture Draw",
+        "description": "Heals 1.5% maximum health each round in Wetland.",
+        "affinity": "recovery"
+      },
+      "sunfeed": {
+        "name": "Light Harvest",
+        "description": "+4 energy each round in Daylight.",
+        "affinity": "vitality"
+      },
+      "dunewalker": {
+        "name": "Sand Stride",
+        "description": "+12% speed in Dunes.",
+        "affinity": "speed"
+      },
+      "marshrunner": {
+        "name": "Marsh Glide",
+        "description": "+12% speed in Wetland.",
+        "affinity": "speed"
+      },
+      "anchored": {
+        "name": "Stone Brace",
+        "description": "+12% defense on Scree.",
+        "affinity": "defense"
+      },
+      "nightvision": {
+        "name": "Dark Adaptation",
+        "description": "+5 percentage points to accuracy at Night.",
+        "affinity": "dexterity"
+      },
+      "bastion": {
+        "name": "Folded Rampart",
+        "description": "Guard blocks 65% of ordinary damage instead of 55%.",
+        "affinity": "defense"
+      },
+      "breaker": {
+        "name": "Seam Finder",
+        "description": "Attacks against Guard deal 20% more damage after its reduction.",
+        "affinity": "intellect"
+      },
+      "opportunist": {
+        "name": "Stress Sense",
+        "description": "12% more damage against irritated or slowed targets.",
+        "affinity": "power"
       }
     },
     "actions": {
       "strike": {
         "name": "Strike",
-        "cost": 8,
-        "description": "Efficient physical attack. Power against defense."
+        "cost": 12,
+        "description": "Reliable contact attack. Power against defense.",
+        "power": 1,
+        "accuracy": 0.92,
+        "contact": true
       },
       "feint": {
         "name": "Feint",
         "cost": 18,
-        "description": "Dexterity and intellect; partly bypasses guard and armor."
+        "description": "A tactical hit using dexterity and intellect. Bypasses most of Guard.",
+        "power": 0.9,
+        "accuracy": 0.94,
+        "mental": true,
+        "pierce": true
+      },
+      "lunge": {
+        "name": "Lunge",
+        "cost": 24,
+        "description": "Heavy contact attack. Stronger, but less accurate.",
+        "power": 1.5,
+        "accuracy": 0.78,
+        "contact": true
+      },
+      "sweep": {
+        "name": "Sweep",
+        "cost": 20,
+        "description": "Lower damage. Slows the target by 20% for the next two rounds.",
+        "power": 0.75,
+        "accuracy": 0.88,
+        "contact": true,
+        "status": "slow"
+      },
+      "venom": {
+        "name": "Irritant spray",
+        "cost": 22,
+        "description": "Low impact, then 2.5% maximum health damage for three rounds. Does not stack.",
+        "power": 0.4,
+        "accuracy": 0.88,
+        "status": "poison"
+      },
+      "pulse": {
+        "name": "Neural pulse",
+        "cost": 22,
+        "description": "Intellect-based pressure that partially bypasses defense.",
+        "power": 1.05,
+        "accuracy": 0.88,
+        "mental": true
+      },
+      "drain": {
+        "name": "Siphon",
+        "cost": 20,
+        "description": "Light contact attack; heals 40% of damage actually dealt.",
+        "power": 0.7,
+        "accuracy": 0.9,
+        "contact": true,
+        "drain": 0.4
+      },
+      "lull": {
+        "name": "Lulling signal",
+        "cost": 26,
+        "description": "No damage. Base 65% chance to induce two sleeping turns; intellect, accuracy and resolve modify it. Five-round cooldown.",
+        "accuracy": 0.65,
+        "status": "sleep",
+        "cooldown": 5
       },
       "guard": {
         "name": "Guard",
         "cost": 0,
-        "description": "Blocks 55% of strikes or 18% of feints until the next action; restores 18 energy."
+        "description": "Protects for this whole round, even if slower. Blocks 55% damage, but only 15% of a Feint. +14 energy."
       },
       "recover": {
-        "name": "Recover",
+        "name": "Breathe",
         "cost": 0,
-        "description": "Restores 26 energy. Healing has a three-turn cooldown."
+        "description": "Restores 34 energy. Does not heal health."
       },
       "focus": {
         "name": "Focus",
-        "cost": 8,
-        "description": "Empowers the next two attacks. High intellect increases the bonus."
+        "cost": 10,
+        "description": "Next two damaging attacks gain 35% damage and 3 points of accuracy. Cannot stack."
+      },
+      "rest": {
+        "name": "Rest",
+        "cost": 0,
+        "description": "Heals 15% health plus recovery bonus, clears irritation, then sleeps for two turns. Six-round cooldown.",
+        "cooldown": 6
+      },
+      "cleanse": {
+        "name": "Purge",
+        "cost": 14,
+        "description": "Clears irritation and slowing, and heals 4% maximum health.",
+        "cooldown": 4
+      },
+      "sleep": {
+        "name": "Sleep",
+        "cost": 0,
+        "description": "Forced while asleep: heals 3% health and restores 12 energy. One sleeping turn passes.",
+        "internal": true
       }
     },
-    "maxRounds": 40
+    "maxRounds": 60,
+    "terrains": {
+      "plain": {
+        "name": "Open plain",
+        "description": "Neutral ground. No habitat advantage.",
+        "moisture": 0.5,
+        "cover": 0.2,
+        "color": "#334441"
+      },
+      "wetland": {
+        "name": "Wetland",
+        "description": "Moisture-adapted creatures gain up to 8% speed and recovery; dry-adapted ones lose up to 8%.",
+        "moisture": 0.95,
+        "cover": 0.45,
+        "color": "#31554d"
+      },
+      "dunes": {
+        "name": "Dunes",
+        "description": "Dry-adapted creatures gain up to 8% speed and recovery; moisture-adapted ones lose up to 8%.",
+        "moisture": 0.05,
+        "cover": 0.05,
+        "color": "#63533e"
+      },
+      "forest": {
+        "name": "Dense growth",
+        "description": "High-cover creatures gain up to 8% dexterity. Low-cover creatures lose up to 8%.",
+        "moisture": 0.65,
+        "cover": 0.95,
+        "color": "#344c38"
+      },
+      "scree": {
+        "name": "Scree",
+        "description": "Short, thick supports gain up to 8% defense. Longer, thin supports lose up to 8%.",
+        "moisture": 0.25,
+        "cover": 0.2,
+        "color": "#4e4d59"
+      }
+    },
+    "times": {
+      "day": "Daylight",
+      "dusk": "Dusk / dawn",
+      "night": "Night"
+    }
   },
   "search": {
     "limit": [
