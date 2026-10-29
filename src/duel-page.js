@@ -17,6 +17,15 @@ import {
 import { createArena } from "./duel-motion.js";
 import { duelURL, parseDuelURL } from "./duel-links.js";
 import { routeURL } from "./routes.js";
+import { randomSeed } from "./random.js";
+import { randomOpponent, freshCode } from "./duel-opponents.js";
+import {
+  MAIN_MOVES,
+  EXTRA_MOVES,
+  MOVE_KEYS,
+  MOVE_NOTES,
+  battleAdvice,
+} from "./duel-advice.js";
 const $ = (id) => document.getElementById(id),
   node = (tag, text) => {
     const n = document.createElement(tag);
@@ -38,10 +47,14 @@ let active = false,
   timer = null,
   options = null,
   versions = [2, 2];
-const freshCode = () => {
-  const a = new Uint32Array(2);
-  crypto.getRandomValues(a);
-  return Array.from(a, (n) => n.toString(36)).join("-");
+const recentOpponents = [];
+const labelButton = (id, text, key) => {
+  const button = $(id);
+  button.replaceChildren(node("span", text));
+  if (key) {
+    button.append(node("kbd", key));
+    button.setAttribute("aria-keyshortcuts", key);
+  }
 };
 $("encounter-code").value = freshCode();
 for (const [id, item] of Object.entries(TERRAINS)) {
@@ -53,8 +66,11 @@ for (const [id, label] of Object.entries(TIMES)) {
 function pause() {
   auto = false;
   clearTimeout(timer);
-  $("autoplay").textContent =
-    replayAt < replay.length ? "Play recorded rounds" : "Autoplay";
+  labelButton(
+    "autoplay",
+    replayAt < replay.length ? "Watch replay" : "Auto",
+    "A",
+  );
 }
 function invalidate() {
   pause();
@@ -67,7 +83,7 @@ function invalidate() {
   busy = false;
   $("encounter").hidden = true;
   $("notice").textContent =
-    "Settings changed. Preview the encounter to apply them.";
+    "Seeds changed. Select Use these creatures to apply them.";
 }
 function health(view = state?.fighters) {
   if (!state) return;
@@ -80,7 +96,7 @@ function health(view = state?.fighters) {
     title.className = "fighter-title";
     title.append(
       node("strong", i === 0 ? "Your creature" : "Opponent"),
-      node("span", short(f.identity.seed)),
+      node("span", "seed " + short(f.identity.seed)),
     );
     section.append(title);
     if (f.profile.absolute) {
@@ -107,7 +123,7 @@ function health(view = state?.fighters) {
     if (v.sleep) tags.push(`Asleep · ${v.sleep} turn(s)`);
     if (v.poison) tags.push(`Irritated · ${v.poison}`);
     if (v.slow) tags.push(`Slowed · ${v.slow}`);
-    if (v.focus) tags.push(`Focused · ${v.focus}`);
+    if (v.focus) tags.push(`Focused · ${v.focus} boosted attacks`);
     const text = node("p", tags.join(" / ") || "Awake · ready");
     text.className = "status-tags";
     section.append(text);
@@ -184,23 +200,26 @@ function logEvent(e) {
       " · " +
       [...new Set(e.ability)].map((id) => ABILITIES[id].name).join(", ");
   if (e.notes.length) text += " · " + e.notes.join(" ");
-  // Quiet energy regeneration is already visible in the energy bar.
   if (e.action !== "upkeep" || e.damage || e.healing || e.ability.length)
     $("events").append(node("li", text));
   $("events").scrollTop = $("events").scrollHeight;
 }
 function update() {
   if (!state) return;
+  const focusMove = document.activeElement?.dataset.move;
   health();
   comparison();
-  $("begin").hidden = active;
+  $("begin").hidden = active || state.finished;
+  $("play-round").hidden = !active;
   $("autoplay").hidden = !active || state.finished;
-  $("reset").disabled = busy;
-  $("play-area").hidden = !active || state.finished;
+  $("reset").disabled = busy || auto;
+  $("new-opponent").disabled = busy || auto;
+  $("play-area").hidden = state.finished;
+  $("result-tip").hidden = !state.finished;
   $("copy-encounter").disabled = busy;
   $("copy-encounter").textContent = history.length
-    ? "Copy replay link"
-    : "Copy encounter link";
+    ? "Share replay"
+    : "Share fight";
   $("round-status").textContent = busy
     ? `Round ${state.round} · playing…`
     : state.finished
@@ -213,49 +232,84 @@ function update() {
         : `${state.winner === 0 ? "Your creature wins" : "Opponent wins"}${state.reason === "absolute" ? " · no finite contest" : ` · round ${state.round}`}`
       : !active
         ? "Ready to begin"
-        : busy
-          ? `Round ${state.round} · playing…`
-          : `Round ${state.round + 1} · ${replayAt < replay.length ? "recorded moves ready" : "your move"}`;
-  $("begin").disabled = state.finished;
+        : `Round ${state.round + 1} · ${replayAt < replay.length ? "recorded moves ready" : "your move"}`;
+  $("begin").disabled = state.finished || busy;
+  if (state.fighters.some((f) => f.profile.absolute) || state.finished)
+    $("turn-order").textContent = "";
+  else {
+    const [you, foe] = state.fighters.map((f) => effectiveStats(f, state));
+    $("turn-order").textContent =
+      you.speed === foe.speed
+        ? "Equal speed · order varies"
+        : you.speed > foe.speed
+          ? "You act first"
+          : "Opponent acts first";
+  }
   if (state.finished) pause();
-  const moves = availableActions(state, 0).filter(
-    (m) => !m.internal || state.fighters[0].sleep,
-  );
-  if (state.fighters[0].sleep) selected = "sleep";
+  const sleeping = !!state.fighters[0].sleep;
+  if (sleeping) selected = "sleep";
   else if (selected === "sleep") selected = "strike";
+  const moves = new Map(availableActions(state, 0).map((m) => [m.id, m]));
   $("moves").replaceChildren();
-  for (const m of moves) {
-    const b = node("button");
-    b.type = "button";
-    b.dataset.move = m.id;
-    b.setAttribute("aria-pressed", String(selected === m.id));
-    const title = node("span");
-    title.className = "move-title";
-    title.append(node("span", m.name), node("small", m.cost + " energy"));
-    b.append(title, node("small", m.available ? m.description : m.reason));
-    b.disabled = busy || auto || replayAt < replay.length;
-    b.addEventListener("click", () => {
-      selected = m.id;
-      update();
-    });
-    $("moves").append(b);
+  $("extra-moves").replaceChildren();
+  $("more-moves").hidden = sleeping;
+  for (const [root, ids] of [
+    ["moves", sleeping ? ["sleep"] : MAIN_MOVES],
+    ["extra-moves", sleeping ? [] : EXTRA_MOVES],
+  ]) {
+    for (const id of ids) {
+      const m = moves.get(id),
+        b = node("button");
+      b.type = "button";
+      b.dataset.move = id;
+      b.dataset.unavailable = String(!m.available);
+      b.setAttribute("aria-pressed", String(selected === id));
+      if (MOVE_KEYS[id]) b.setAttribute("aria-keyshortcuts", MOVE_KEYS[id]);
+      const title = node("span");
+      title.className = "move-title";
+      title.append(node("span", m.name));
+      if (MOVE_KEYS[id]) title.append(node("kbd", MOVE_KEYS[id].toUpperCase()));
+      const note = node("span", MOVE_NOTES[id]);
+      note.className = "move-note";
+      const cost = node("span", m.available ? `${m.cost} energy` : m.reason);
+      cost.className = "move-cost";
+      b.append(title, note, cost);
+      b.disabled = busy || auto || replayAt < replay.length;
+      b.addEventListener("click", () => {
+        selected = id;
+        update();
+      });
+      $(root).append(b);
+    }
   }
   const m = ACTIONS[selected],
     check = actionAvailability(state, 0, selected);
   $("move-explanation").textContent =
     `${m.name} · ${m.cost} energy. ${m.description}${check.available ? "" : " " + check.reason}`;
+  $("combo-tip").textContent = battleAdvice(state, selected);
   const recorded = replayAt < replay.length;
-  $("play-round").textContent = recorded
-    ? "Play recorded round"
-    : selected === "sleep"
-      ? "Pass one sleeping turn"
-      : `Use ${m.name} · play one round`;
-  $("play-round").disabled = busy || auto || (!recorded && !check.available);
-  $("autoplay").textContent = auto
-    ? "Pause after this round"
-    : recorded
-      ? "Play recorded rounds"
-      : "Autoplay";
+  labelButton(
+    "play-round",
+    !active
+      ? "Start fight"
+      : recorded
+        ? "Play recorded round"
+        : selected === "sleep"
+          ? "Pass one sleeping turn"
+          : `Use ${m.name}`,
+    "Enter",
+  );
+  $("play-round").disabled =
+    busy || auto || state.finished || (!recorded && !check.available);
+  labelButton(
+    "autoplay",
+    auto ? "Pause" : recorded ? "Watch replay" : "Auto",
+    "A",
+  );
+  if (focusMove)
+    document
+      .querySelector(`[data-move="${focusMove}"]`)
+      ?.focus({ preventScroll: true });
 }
 async function preview(loadedReplay = []) {
   pause();
@@ -267,6 +321,7 @@ async function preview(loadedReplay = []) {
   busy = false;
   records = null;
   $("encounter").hidden = true;
+  $("new-opponent").disabled = true;
   document.body.classList.remove("playing");
   $("notice").textContent = "Preparing creatures…";
   try {
@@ -279,7 +334,6 @@ async function preview(loadedReplay = []) {
       time: $("time").value,
     };
     const nextState = createBattle(...nextRecords, nextOptions);
-    // Validate a replay completely before showing it. Never silently substitute actions.
     let validation = nextState;
     for (const pair of loadedReplay) {
       if (validation.finished)
@@ -305,11 +359,23 @@ async function preview(loadedReplay = []) {
     replayAt = 0;
     $("events").replaceChildren();
     $("encounter").hidden = false;
+    const habitat = conditions(state.fighters[0], state.environment);
+    const changes = Object.entries(habitat.bonuses)
+      .filter(([, value]) => Math.abs(value - 1) >= 0.005)
+      .map(
+        ([key, value]) =>
+          `${STAT_NAMES[key].toLowerCase()} ${value >= 1 ? "+" : ""}${Math.round((value - 1) * 100)}%`,
+      );
     $("conditions").textContent =
-      `${TERRAINS[state.environment.terrain].name} · ${TIMES[state.environment.time]} — ${TERRAINS[state.environment.terrain].description}`;
+      `${TERRAINS[state.environment.terrain].name} · ${TIMES[state.environment.time]} — your ${changes.join(", ") || "ratings are unchanged"}.`;
+    $("conditions").title = TERRAINS[state.environment.terrain].description;
+    $("last-event").textContent =
+      "You play on the left. Choose a move each round; the computer chooses for the opponent.";
+    recentOpponents.push(records[1].identity.seed);
+    if (recentOpponents.length > 12) recentOpponents.shift();
     $("notice").textContent = loadedReplay.length
       ? `Replay ready: ${loadedReplay.length} recorded round(s). Start to watch; no moves have played yet.`
-      : "Review conditions and ratings, then start. You control the left creature.";
+      : "";
     $("back-link").href = routeURL(
       records[0].identity,
       new URL("index.html", location.href).href,
@@ -321,6 +387,7 @@ async function preview(loadedReplay = []) {
       $("encounter").hidden = true;
       state = null;
       records = null;
+      $("new-opponent").disabled = false;
     }
   }
 }
@@ -339,13 +406,16 @@ async function playRound() {
     state = next;
     update();
     health(previous.fighters);
-    if (!auto && !matchMedia("(prefers-reduced-motion: reduce)").matches)
-      $("arena").scrollIntoView({ block: "center", behavior: "smooth" });
+
     for (const event of events) {
       await arena.play(event);
       if (token !== generation) return;
       health(event.snapshot);
       logEvent(event);
+      const latest = Array.from($("events").children)
+        .slice(-2)
+        .map((item) => item.textContent.replace(/^\d+\. /, ""));
+      $("last-event").textContent = latest.join(" · ");
     }
     history.push(pair);
     if (recorded) replayAt++;
@@ -366,40 +436,32 @@ async function playRound() {
     }
   }
 }
-$("setup").addEventListener("submit", (e) => {
-  e.preventDefault();
-  preview();
-});
-for (const id of [
-  "left-seed",
-  "right-seed",
-  "terrain",
-  "time",
-  "encounter-code",
-])
-  $(id).addEventListener("input", () => {
-    if (id === "left-seed") versions[0] = 2;
-    if (id === "right-seed") versions[1] = 2;
-    invalidate();
-  });
-$("new-code").addEventListener("click", () => {
-  $("encounter-code").value = freshCode();
-  invalidate();
-});
-$("help-toggle").addEventListener("click", () => {
-  $("help").open = !$("help").open;
-});
-$("begin").addEventListener("click", () => {
+function beginDuel() {
+  if (!state || state.finished || busy) return;
   active = true;
   $("setup-panel").open = false;
-  document.body.classList.add("playing");
   $("notice").textContent =
-    "Choose a move below. You control the left creature.";
+    replayAt < replay.length
+      ? "This is a replay. Play the recorded rounds to continue."
+      : "";
   update();
-});
-$("play-round").addEventListener("click", playRound);
-$("reset").addEventListener("click", () => preview(replay));
-$("autoplay").addEventListener("click", () => {
+}
+function selectMove(id) {
+  if (
+    !state ||
+    state.finished ||
+    busy ||
+    auto ||
+    replayAt < replay.length ||
+    state.fighters[0].sleep
+  )
+    return;
+  selected = id;
+  if (EXTRA_MOVES.includes(id)) $("more-moves").open = true;
+  update();
+}
+function toggleAuto() {
+  if (!state || state.finished || !active) return;
   if (auto) {
     pause();
     update();
@@ -407,6 +469,115 @@ $("autoplay").addEventListener("click", () => {
     auto = true;
     update();
     playRound();
+  }
+}
+function toggleHelp(open = $("help").hidden) {
+  $("help").hidden = !open;
+  $("help-toggle").setAttribute("aria-expanded", String(open));
+  if (open) {
+    pause();
+    update();
+    $("help").scrollIntoView({ block: "start" });
+    $("close-help").focus({ preventScroll: true });
+  } else $("help-toggle").focus({ preventScroll: true });
+}
+async function newOpponent() {
+  if (busy || auto) return;
+  try {
+    const left = generate($("left-seed").value || randomSeed(), {
+      generatorVersion: versions[0],
+    });
+    const opponent = randomOpponent(left, { recent: recentOpponents });
+    $("left-seed").value = left.identity.seed;
+    $("right-seed").value = opponent.identity.seed;
+    versions[1] = 2;
+    $("encounter-code").value = freshCode();
+    await preview();
+  } catch (error) {
+    $("notice").textContent = error.message;
+  }
+}
+$("setup").addEventListener("submit", (e) => {
+  e.preventDefault();
+  preview();
+});
+for (const id of ["left-seed", "right-seed", "encounter-code"])
+  $(id).addEventListener("input", () => {
+    if (id === "left-seed") versions[0] = 2;
+    if (id === "right-seed") versions[1] = 2;
+    invalidate();
+    $("new-opponent").disabled = false;
+  });
+for (const id of ["terrain", "time"])
+  $(id).addEventListener("change", () => preview());
+$("new-code").addEventListener("click", () => {
+  $("encounter-code").value = freshCode();
+  preview();
+});
+$("new-opponent").addEventListener("click", newOpponent);
+$("help-toggle").addEventListener("click", () => toggleHelp());
+$("close-help").addEventListener("click", () => toggleHelp(false));
+$("begin").addEventListener("click", beginDuel);
+$("play-round").addEventListener("click", () =>
+  active ? playRound() : beginDuel(),
+);
+$("reset").addEventListener("click", () => preview(replay));
+$("autoplay").addEventListener("click", toggleAuto);
+document.addEventListener("keydown", (event) => {
+  if (
+    event.repeat ||
+    event.isComposing ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey
+  )
+    return;
+  if (
+    event.target.isContentEditable ||
+    event.target.closest?.("input, textarea, select, [role=textbox]")
+  )
+    return;
+  const key = event.key.toLowerCase();
+  if (key === "escape") {
+    event.preventDefault();
+    if (!$("help").hidden) toggleHelp(false);
+    else {
+      pause();
+      update();
+    }
+    return;
+  }
+  if (key === "?") {
+    event.preventDefault();
+    toggleHelp();
+    return;
+  }
+  if (!$("help").hidden) return;
+  if (key === "n") {
+    event.preventDefault();
+    newOpponent();
+    return;
+  }
+  if (key === "a") {
+    event.preventDefault();
+    toggleAuto();
+    return;
+  }
+  if (key === "enter") {
+    if (
+      event.target.closest?.("form, a, summary") ||
+      (event.target.closest?.("button") &&
+        !event.target.closest("[data-move], #play-round, #begin"))
+    )
+      return;
+    event.preventDefault();
+    if (!auto) active ? playRound() : beginDuel();
+    return;
+  }
+  const id = Object.keys(MOVE_KEYS).find((id) => MOVE_KEYS[id] === key);
+  if (id) {
+    event.preventDefault();
+    selectMove(id);
   }
 });
 $("copy-encounter").addEventListener("click", async () => {
@@ -464,7 +635,10 @@ try {
     $("terrain").value = linked.options.terrain;
     $("time").value = linked.options.time;
     preview(linked.history);
-  } else preview();
+  } else {
+    $("left-seed").value = randomOpponent(generate("42")).identity.seed;
+    newOpponent();
+  }
 } catch (e) {
   $("notice").textContent = e.message;
 }

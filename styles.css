@@ -794,3 +794,4 @@ dialog::backdrop {
 #combat-stats[hidden] { display: none; }
 #combat-abilities p { line-height: 1.5; }
 @media (max-width: 420px) { .combat-values { gap: 0 12px; font-size: 12px; } }
+.toolbar kbd { font: 10px ui-monospace, monospace; opacity: .65; margin-left: 4px; }

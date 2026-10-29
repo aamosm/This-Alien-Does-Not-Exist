@@ -38,7 +38,10 @@ async function open(
 }
 async function round(page, move = "strike") {
   const sleep = await page.locator('[data-move="sleep"]').count();
-  await page.locator(`[data-move="${sleep ? "sleep" : move}"]`).click();
+  const card = page.locator(`[data-move="${sleep ? "sleep" : move}"]`);
+  if (!(await card.isVisible()))
+    await page.locator("#more-moves summary").click();
+  await card.click();
   await page.locator("#play-round").click();
   await page.waitForFunction(
     () =>
@@ -53,7 +56,16 @@ test("arena explains choices, honors setup, animates attacks and fits desktop/mo
   assert.match(await page.locator("#help").innerText(), /not a creature seed/);
   await page.locator("#help-toggle").click();
   await page.locator("#begin").click();
-  assert.equal(await page.locator("#moves button").count(), 13);
+  assert.equal(await page.locator("#moves button").count(), 6);
+  assert.equal(await page.locator("#extra-moves button").count(), 7);
+  assert(!(await page.locator("#more-moves").getAttribute("open")));
+  assert.equal(
+    await page.evaluate(
+      () => getComputedStyle(document.documentElement).backgroundColor,
+    ),
+    "rgb(10, 10, 10)",
+  );
+  assert((await page.locator("#play-round").boundingBox()).y < 900);
   await page.locator('[data-move="recover"]').click();
   assert.match(
     await page.locator("#move-explanation").innerText(),
@@ -95,7 +107,9 @@ test("arena explains choices, honors setup, animates attacks and fits desktop/mo
   await context.close();
 });
 test("Rest explains two sleeping turns, sleep advances, and settings invalidate an ongoing battle", async () => {
-  const { page, context, errors } = await open("", { reducedMotion: "reduce" });
+  const { page, context, errors } = await open(undefined, {
+    reducedMotion: "reduce",
+  });
   await page.locator("#begin").click();
   await round(page, "rest");
   assert.match(await page.locator("#fighter-0").innerText(), /Asleep/);
@@ -103,10 +117,7 @@ test("Rest explains two sleeping turns, sleep advances, and settings invalidate 
   await round(page);
   await round(page);
   assert(!(await page.locator("#fighter-0").innerText()).includes("Asleep"));
-  await page.locator("#setup-panel summary").click();
   await page.locator("#terrain").selectOption("dunes");
-  assert(await page.locator("#encounter").isHidden());
-  await page.locator("#preview").click();
   await page.waitForFunction(
     () => !document.querySelector("#encounter").hidden,
   );
@@ -133,10 +144,7 @@ test("autoplay advances visible rounds, pauses and cancels cleanly when settings
   await page.waitForTimeout(650);
   assert.equal(await page.locator("#round-status").innerText(), status);
   await page.locator("#autoplay").click();
-  await page.locator("#setup-panel summary").click();
-  await page.locator("#new-code").click();
-  assert(await page.locator("#encounter").isHidden());
-  await page.locator("#preview").click();
+  await page.locator("#terrain").selectOption("forest");
   await page.waitForFunction(
     () => !document.querySelector("#encounter").hidden,
   );
@@ -201,6 +209,7 @@ test("endpoint, invalid replay, upper seed limit, legacy and standalone HTML sta
     /no finite contest/,
   );
   assert.equal(await page.locator("#fighter-0 progress").count(), 0);
+  await page.locator("#setup-panel > summary").click();
   await page.locator("#right-seed").fill("circle");
   await page.locator("#preview").click();
   await page.waitForFunction(
@@ -229,6 +238,127 @@ test("endpoint, invalid replay, upper seed limit, legacy and standalone HTML sta
   await page.locator("#begin").click();
   await round(page);
   assert.match(await page.locator("#round-status").innerText(), /Round 2/);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("new opponents vary without replacing your creature and a shared match preserves both", async () => {
+  const { page, context, errors } = await open(undefined, {
+    reducedMotion: "reduce",
+  });
+  const seeds = new Set([await page.locator("#right-seed").inputValue()]);
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press("n");
+    await page.waitForFunction(
+      () => !document.querySelector("#encounter").hidden,
+    );
+    const seed = await page.locator("#right-seed").inputValue();
+    assert(!seeds.has(seed));
+    seeds.add(seed);
+    assert.equal(await page.locator("#left-seed").inputValue(), "42");
+    assert.equal(
+      await page.locator("#round-status").innerText(),
+      "Ready to begin",
+    );
+  }
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: async (text) => {
+          window.copied = text;
+        },
+      },
+    }),
+  );
+  await page.locator("#copy-encounter").click();
+  const url = await page.evaluate(() => window.copied),
+    right = await page.locator("#right-seed").inputValue();
+  await page.goto(url);
+  await page.waitForFunction(
+    () => !document.querySelector("#encounter").hidden,
+  );
+  assert.equal(await page.locator("#right-seed").inputValue(), right);
+  await page.goto(origin + "/duel.html");
+  await page.waitForFunction(
+    () => !document.querySelector("#encounter").hidden,
+  );
+  assert.notEqual(await page.locator("#right-seed").inputValue(), "17");
+  assert.notEqual(
+    await page.locator("#right-seed").inputValue(),
+    await page.locator("#left-seed").inputValue(),
+  );
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("visible shortcuts select, play, pause and explain combos without firing in inputs or help", async () => {
+  const { page, context, errors } = await open(undefined, {
+    reducedMotion: "reduce",
+  });
+  assert.match(await page.locator('[data-move="focus"]').innerText(), /5/);
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("5");
+  assert.match(await page.locator("#combo-tip").innerText(), /Focus → Lunge/);
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() =>
+    document.querySelector("#round-status").textContent.includes("Round 2"),
+  );
+  await page.keyboard.press("2");
+  assert.match(await page.locator("#combo-tip").innerText(), /35%/);
+  await page.keyboard.press("e");
+  assert.equal(
+    await page.locator('[data-move="pulse"]').getAttribute("aria-pressed"),
+    "true",
+  );
+  assert(await page.locator('[data-move="pulse"]').isVisible());
+  await page.keyboard.press("?");
+  assert(await page.locator("#help").isVisible());
+  const right = await page.locator("#right-seed").inputValue();
+  await page.keyboard.press("n");
+  assert.equal(await page.locator("#right-seed").inputValue(), right);
+  await page.keyboard.press("Escape");
+  assert(await page.locator("#help").isHidden());
+  await page.locator("#setup-panel > summary").click();
+  await page.locator("#right-seed").focus();
+  await page.keyboard.press("n");
+  assert((await page.locator("#right-seed").inputValue()).includes("n"));
+  await page.locator("#right-seed").fill(right);
+  await page.locator("#preview").click();
+  await page.waitForFunction(
+    () => !document.querySelector("#encounter").hidden,
+  );
+  await page.locator("#begin").click();
+  await page.keyboard.press("a");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(
+    () =>
+      !document.querySelector("#round-status").textContent.includes("playing"),
+  );
+  const status = await page.locator("#round-status").innerText();
+  await page.waitForTimeout(700);
+  assert.equal(await page.locator("#round-status").innerText(), status);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test("every move renders its own motion without canvas or browser errors", async () => {
+  const { page, context, errors } = await open();
+  const rendered = await page.evaluate(async () => {
+    const { generate } = await import('./src/engine.js');
+    const { createArena } = await import('./src/duel-motion.js');
+    const { ACTIONS } = await import('./src/combat.js');
+    const canvas = document.querySelector('#arena');
+    const arena = await createArena(canvas, [generate('42'), generate('17')], { terrain: 'plain', time: 'day' });
+    const views = new Set();
+    for (const [action, move] of Object.entries(ACTIONS)) {
+      arena.draw({ actor: 0, action, hit: true, damage: move.power ? 42 : 0, healing: ['rest', 'sleep', 'drain'].includes(action) ? 14 : 0 }, .55);
+      views.add(canvas.toDataURL());
+    }
+    arena.draw({ actor: 0, action: 'lunge', damage: 42, hit: true }, .48);
+    return views.size;
+  });
+  assert(rendered >= 12);
+  await page.screenshot({ path: '.test-output/duel-lunge.png', fullPage: true });
   assert.deepEqual(errors, []);
   await context.close();
 });

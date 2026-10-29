@@ -1,5 +1,6 @@
 import { STAT_NAMES, STAT_HELP, ABILITIES } from "./combat.js";
 import { duelURL } from "./duel-links.js";
+import { randomOpponent, freshCode } from "./duel-opponents.js";
 const node = (tag, text) => {
   const e = document.createElement(tag);
   if (text !== undefined) e.textContent = text;
@@ -10,13 +11,11 @@ export function createCombatUI({ generate }) {
   let current = null;
   $("open-duel").addEventListener("click", () => {
     if (!current) return;
-    const opponent = generate(current.identity.seed === "17" ? "42" : "17");
-    const code = new Uint32Array(2);
-    crypto.getRandomValues(code);
+    const opponent = randomOpponent(current);
     location.href = duelURL(
       current,
       opponent,
-      { battleSeed: Array.from(code, (n) => n.toString(36)).join("-") },
+      { battleSeed: freshCode() },
       [],
       location.href,
     );

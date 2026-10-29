@@ -46,11 +46,11 @@ Search builds genomes from the requested traits rather than scanning random seed
 
 Choose **Duel ↗** to open the dedicated [arena](duel.html). Keeping combat on its own page leaves the generator's interface largely untouched; the arena has room for both creatures, animated attacks, health and energy bars, move explanations and a round log. The built `duel.html` also works offline.
 
-1. Enter the two creature seeds and choose the terrain and time of day. You can leave the encounter choices to the game instead.
-2. Select **Preview encounter** to apply those settings. Expand the comparison to inspect effective ratings, activity preferences, habitat advantages and both creatures' passive abilities.
-3. Select **Start duel** and choose a move to read its explanation. Press **Use … · play one round** to commit the action. Both creatures choose their actions before either attacks, and the faster creature acts first. Guard protects its user for the entire round.
-4. **Breathe** restores energy without healing. **Rest** heals but puts the creature to sleep for two turns, during which the Sleep button advances the fight. Move cards explain their energy costs, cooldowns and availability.
-5. **Autoplay** plays through the visible rounds and can be paused. **Copy replay link** preserves the encounter setup and the moves already played, letting someone else watch the same rounds before continuing.
+1. The creature you were viewing comes with you, and the game finds an opponent. **New opponent** or **N** keeps your creature and finds another. To fight specific creatures, expand **Choose specific creatures** and paste their seeds.
+2. Choose terrain and time above the fight, or leave them random. The line under the arena shows how the conditions affect your creature. **Stats & passive abilities** has the full comparison.
+3. Select **Start fight**, choose a move, then press **Enter** or its Use button. **1–6** select the six main moves. **Q W E R T Y U** select the seven under **More moves**. Both creatures choose before either attacks; the faster creature acts first, and Guard protects for the entire round.
+4. Move hints explain useful sequences as you play. Focus strengthens your next two attacks, so try it before Strike or Lunge. Irritant spray followed by Guard keeps irritation working while you defend. Breathe restores energy; Rest heals but puts you to sleep for two turns.
+5. **Auto / A** plays visible rounds; **Esc** pauses. **Rematch** repeats the same setup. **Share replay** includes the moves already played so someone else can watch and continue. **?** opens help. Shortcuts stay off while you are typing.
 
 The creature seed determines the creature; the encounter code determines chance rolls and any arena choices left to the game. The code is not a strength level, and changing it doesn't change either creature.
 
@@ -106,7 +106,7 @@ npm run audit
 
 `npm run package` creates `dist/This-Alien-Does-Not-Exist.zip`.
 
-For GitHub Pages, publish `index.html`, `404.html`, `.nojekyll`, `alien-api.js`, `api.html` and `LICENSE`. Keep `CNAME` only when using the custom domain.
+For GitHub Pages, publish `index.html`, `duel.html`, `404.html`, `.nojekyll`, `alien-api.js`, `api.html` and `LICENSE`. Keep `CNAME` only when using the custom domain.
 
 ## License
 

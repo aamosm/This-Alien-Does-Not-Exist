@@ -3,167 +3,211 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#101617" />
-    <title>Alien Duel</title>
+    <meta name="theme-color" content="#0a0a0a" />
+    <title>Duel · This Alien Doesn't Exist</title>
     <link id="arena-icon" rel="icon" href="data:," />
-    <style data-bundle="duel">
-    </style>
+    <style data-bundle="duel"></style>
   </head>
   <body>
     <main>
       <header>
-        <a id="back-link" href="index.html">← Specimens</a
-        ><span>FIELD SIMULATION / DUEL</span
-        ><button id="help-toggle" type="button">How to play</button>
+        <a id="back-link" href="index.html">← Generator</a>
+        <h1>Duel</h1>
+        <button
+          id="help-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="help"
+        >
+          How to play <kbd>?</kbd>
+        </button>
       </header>
-      <section class="intro">
-        <h1>Two creatures. One encounter.</h1>
-        <p>
-          Pick your specimen, set the conditions, then choose one move per
-          round.
-        </p>
-      </section>
-      <details id="help">
-        <summary>How this encounter works</summary>
-        <div class="help-grid">
-          <p>
-            <strong>1. Creature seeds identify fighters.</strong> They determine
-            anatomy, ratings, two passive abilities and activity preference. You
-            control the left creature; the computer controls the right.
-          </p>
-          <p>
-            <strong>2. Choose an arena.</strong> Terrain and time give small,
-            visible advantages. “From encounter code” selects them reproducibly.
-            Creatures start awake, even outside their preferred active hours.
-          </p>
-          <p>
-            <strong>3. Select a move, then play the round.</strong> Both
-            creatures commit before either acts. Speed determines attack order.
-            Guard protects for the whole round. Health reaching zero ends the
-            fight; energy pays for moves.
-          </p>
-          <p>
-            <strong>4. The encounter code controls chance.</strong> It is not a
-            creature seed or a power level. Same creatures, code, terrain, time,
-            rules and move sequence give the same outcome. Changing your moves
-            can change the winner. “New code” creates a different encounter.
-          </p>
-          <p>
-            <strong>Sleep and recovery.</strong> Breathe restores energy only.
-            Rest heals but leaves you asleep for two turns. While asleep, use
-            the Sleep button to advance a round. Passives trigger automatically;
-            their effects appear in the log.
-          </p>
-          <p>
-            <strong>Autoplay plays visibly.</strong> Pause stops before the next
-            round. Replay links retain the moves already played. After round 30
-            healing is halved; after round 45 it stops. Unfinished fights draw
-            after 60 rounds.
-          </p>
+      <form id="setup">
+        <div class="setup-bar">
+          <button id="new-opponent" type="button">
+            New opponent <kbd>N</kbd>
+          </button>
+          <label
+            >Terrain
+            <select id="terrain">
+              <option value="random">Random</option>
+            </select></label
+          >
+          <label
+            >Time
+            <select id="time">
+              <option value="random">Random</option>
+            </select></label
+          >
         </div>
-      </details>
-      <details id="setup-panel" open>
-        <summary>Encounter settings</summary>
-        <form id="setup">
-          <div class="setup-grid">
+        <details id="setup-panel">
+          <summary>Choose specific creatures</summary>
+          <p>
+            Any generated creature can fight. Its seed is its address: paste one
+            here to bring it back. New opponent picks a fresh creature for you.
+          </p>
+          <div class="seed-fields">
             <label
               >Your creature seed<input
                 id="left-seed"
-                value="42"
-                required
-                autocomplete="off"
-                maxlength="1100" /></label
-            ><label
-              >Opponent seed<input
-                id="right-seed"
-                value="17"
                 required
                 autocomplete="off"
                 maxlength="1100"
             /></label>
             <label
-              >Terrain<select id="terrain">
-                <option value="random">From encounter code</option>
-              </select></label
-            ><label
-              >Time<select id="time">
-                <option value="random">From encounter code</option>
-              </select></label
-            >
-          </div>
-          <div class="encounter-row">
-            <label
-              >Encounter code<input
-                id="encounter-code"
-                maxlength="64"
+              >Opponent seed<input
+                id="right-seed"
                 required
-                aria-describedby="code-help" /></label
-            ><button id="new-code" type="button">New code</button
-            ><button id="preview" type="submit">Preview encounter</button>
+                autocomplete="off"
+                maxlength="1100"
+            /></label>
           </div>
-          <p class="muted" id="code-help">
-            Controls chance and automatic conditions—not creature strength.
-            Preview applies your settings and resets the fight.
-          </p>
-        </form>
-      </details>
+          <details id="replay-settings">
+            <summary>Chance and replay settings</summary>
+            <p id="code-help">
+              The encounter code controls chance rolls and random terrain/time.
+              It is not a creature seed or a strength level. Same code,
+              creatures, settings and moves give the same fight. You can leave
+              this alone.
+            </p>
+            <div class="code-row">
+              <label
+                >Encounter code<input
+                  id="encounter-code"
+                  maxlength="64"
+                  required
+                  aria-describedby="code-help" /></label
+              ><button id="new-code" type="button">Shuffle chance</button>
+            </div>
+          </details>
+          <button id="preview" type="submit">Use these creatures</button>
+        </details>
+      </form>
       <p id="notice" role="status" aria-live="polite"></p>
       <section id="encounter" hidden>
-        <div class="arena-heading">
-          <p id="conditions"></p>
-          <button id="copy-encounter" type="button">Copy encounter link</button>
+        <div class="duel-layout">
+          <section class="arena-side" aria-label="Battle">
+            <div class="fighters">
+              <section id="fighter-0" aria-label="Your creature"></section>
+              <section id="fighter-1" aria-label="Opponent"></section>
+            </div>
+            <canvas
+              id="arena"
+              width="1000"
+              height="480"
+              role="img"
+              aria-label="Your creature on the left; computer opponent on the right"
+            ></canvas>
+            <div class="battle-heading">
+              <h2 id="round-status" aria-live="polite">Ready to begin</h2>
+              <span id="turn-order" class="muted"></span>
+            </div>
+            <p id="last-event" aria-live="polite">
+              You play on the left. Choose a move each round; the computer
+              chooses for the opponent.
+            </p>
+            <p id="conditions" class="muted"></p>
+            <details id="battle-log">
+              <summary>Battle log</summary>
+              <ol id="events" aria-live="off"></ol>
+            </details>
+          </section>
+          <aside class="controls" aria-label="Your moves">
+            <div class="control-heading">
+              <h2>Your move</h2>
+              <span class="muted">Keys select · Enter plays</span>
+            </div>
+            <div id="play-area">
+              <div id="moves" role="group" aria-label="Main moves"></div>
+              <details id="more-moves">
+                <summary>
+                  More moves <span class="muted">· slow, irritate, heal…</span>
+                </summary>
+                <div
+                  id="extra-moves"
+                  role="group"
+                  aria-label="More moves"
+                ></div>
+              </details>
+              <div class="chosen-move">
+                <p id="move-explanation"></p>
+                <button id="begin" class="primary" type="button">
+                  Start fight <kbd>Enter</kbd>
+                </button>
+                <button id="play-round" class="primary" type="button">
+                  Use Strike <kbd>Enter</kbd>
+                </button>
+              </div>
+              <p id="combo-tip"></p>
+            </div>
+            <p id="result-tip" hidden>
+              Try a different approach with Rematch, or find a new opponent.
+            </p>
+            <div class="play-tools">
+              <button id="autoplay" type="button" hidden>
+                Auto <kbd>A</kbd>
+              </button>
+              <button id="reset" type="button">Rematch</button>
+              <button id="copy-encounter" type="button">Share</button>
+            </div>
+            <details id="comparison">
+              <summary>Stats &amp; passive abilities</summary>
+              <div id="comparison-content"></div>
+            </details>
+          </aside>
         </div>
-        <div class="fighters">
-          <section id="fighter-0" aria-label="Your creature"></section>
-          <section id="fighter-1" aria-label="Opponent"></section>
+      </section>
+      <section id="help" hidden aria-labelledby="help-title">
+        <div class="help-heading">
+          <h2 id="help-title">How to play</h2>
+          <button id="close-help" type="button">Close <kbd>Esc</kbd></button>
         </div>
-        <canvas
-          id="arena"
-          width="1000"
-          height="430"
-          role="img"
-          aria-label="Your creature on the left; opponent on the right"
-        ></canvas>
-        <div class="battle-heading">
-          <h2 id="round-status" aria-live="polite">Ready</h2>
-          <div>
-            <button id="begin" type="button">Start duel</button
-            ><button id="autoplay" type="button" hidden>Autoplay</button
-            ><button id="reset" type="button">Reset encounter</button>
-          </div>
-        </div>
-        <div id="play-area" hidden>
-          <p class="muted">
-            Select a move to inspect it. Then play one round. The opponent
-            chooses independently.
-          </p>
-          <div id="moves" role="group" aria-label="Choose your move"></div>
-          <div class="chosen-move">
-            <p id="move-explanation"></p>
-            <button id="play-round" type="button">Play round</button>
-          </div>
-        </div>
-        <details id="comparison">
-          <summary>Compare ratings, activity and passive abilities</summary>
-          <div id="comparison-content"></div>
-        </details>
-        <details id="battle-log" open>
-          <summary>Round-by-round record</summary>
-          <ol id="events" aria-live="off"></ol>
+        <p>
+          You control the left creature. Get the opponent's health to zero. Both
+          choose a move before the round plays; the faster creature goes first.
+          Guard protects for the whole round.
+        </p>
+        <p>
+          Select a move with a click or its key, then press Enter to use it.
+          Energy pays for moves. Breathe restores energy; Rest heals, but leaves
+          you asleep for two turns. Passive abilities work automatically.
+        </p>
+        <p>
+          <strong>Try a sequence.</strong> Focus → Strike boosts two attacks.
+          Irritant spray → Guard lets irritation keep hurting the opponent while
+          you defend. Sweep → Lunge can help you attack first next round. These
+          are ordinary moves used together, not hidden button combinations.
+        </p>
+        <p>
+          <strong>Finding a fight.</strong> New opponent keeps your creature and
+          finds another. Ordinary creatures share an 800-point stat budget;
+          their strengths differ. Terrain and activity hours give small
+          advantages. You can choose them above or leave them random. Every
+          creature starts awake.
+        </p>
+        <p>
+          <strong>Seeds.</strong> A creature seed identifies one creature. The
+          encounter code controls chance; it is not a creature seed. You never
+          need to type either to play. Share keeps the setup and any moves
+          already played, so someone else can replay them.
+        </p>
+        <p>
+          <strong>Keys.</strong> 1–6 select the main moves. Q W E R T Y U select
+          the extra moves. Enter starts or plays one round. N finds a new
+          opponent. A toggles automatic play. ? opens this help. Esc closes help
+          or pauses automatic play. Shortcuts stay off while typing.
+        </p>
+        <p class="muted">
+          Rematch repeats the same setup and rolls; changing your moves can
+          change the outcome. Healing halves after round 30, stops after round
+          45, and a fight still going at round 60 is a draw.
+        </p>
+        <details id="field-manual">
+          <summary>All moves, stats and passive abilities</summary>
+          <div id="manual-content"></div>
         </details>
       </section>
-      <details id="field-manual">
-        <summary>
-          Field manual · ratings, moves and all 24 passive abilities
-        </summary>
-        <div id="manual-content"></div>
-      </details>
-      <footer>
-        Fictional ecological combat model · no elemental types · simulated on
-        your device.
-      </footer>
     </main>
-    <script data-bundle="duel">
-    </script>
+    <script data-bundle="duel"></script>
   </body>
 </html>

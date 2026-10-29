@@ -929,3 +929,11 @@ try {
   $("search-status").textContent = e.message;
   $("search-dialog").showModal();
 }
+
+addEventListener("keydown", (event) => {
+  if (event.repeat || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.target.isContentEditable || event.target.closest?.("input, textarea, select, [role=textbox]") || document.querySelector("dialog[open]")) return;
+  const key = event.key.toLowerCase();
+  if (key === "n") { event.preventDefault(); discover(); }
+  if (key === "d" && !$("open-duel").disabled) { event.preventDefault(); $("open-duel").click(); }
+});
